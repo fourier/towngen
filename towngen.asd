@@ -13,6 +13,8 @@
   :author ""
   :license ""
   :depends-on (alexandria cmu-infix ppath)
-  :components ((:file "voronoi"))
+  :components ((:file "package")
+               (:file "prio-queue")
+               (:file "voronoi"))
   :description "")
 ;;  :in-order-to ((test-op (test-op towngen-test))))

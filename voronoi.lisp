@@ -1,7 +1,3 @@
-(in-package :cl-user)
-(defpackage town-gen
-  (:use :cl :alexandria))
-
 (in-package town-gen)
 
 ;; enable infix syntax reader 
