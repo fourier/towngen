@@ -71,7 +71,13 @@ shifting if necessary"
     (setf r el))
   entry)
 
-  
+(defmethod prio-queue-entry-insert-child ((parent prio-queue-entry)
+                                          (entry prio-queue-entry))
+  "Inserts the ENTRY into child list of PARENT, destrictively for ENTRY - modifying its left/right pointers"
+  (if-let (child (slot-value parent 'child))
+      (prio-queue-entry-insert-right child entry)
+    (setf child entry)))
+
 
 ;; priority queue structure
 (defclass prio-queue ()
@@ -137,38 +143,36 @@ Complexity: O(1)"
     
     
 (defmethod prio-queue-pop ((q prio-queue))
-  (with-slots (count test-function top roots) q
+  (with-slots (count top roots) q
     (when top
-      (when-let (child (prio-queue-entry-child top))
+      (let ((r (prio-queue-entry-right top))
+            (top-value (prio-queue-entry-entry top)))
         ;; move all children to the roots list
-        (prio-queue-list-iterate
-         child
-         (lambda (e)
-           (prio-queue-roots-insert q e)
-           (setf (prio-queue-entry-parent e) nil))))
-      ;; remove the top element from roots list
-      (prio-queue-roots-remove q top)
-      (if (eq (prio-queue-entry-right top) top)
-          ;; if no right branches, it was the last element
-          (setf top nil
-                roots nil)
-          ;; otherwise
-          (progn
-            (setf top (prio-queue-entry-right top))
-            (prio-queue-consolidate q)))
-      (decf count)
-      (prio-queue-entry-entry top))))
+        (when-let (child (prio-queue-entry-child top))
+          (prio-queue-list-iterate
+           child
+           (lambda (e)
+             (prio-queue-roots-insert q e)
+             (setf (prio-queue-entry-parent e) nil))))
+        ;; remove the top element from roots list
+        (prio-queue-roots-remove q top)
+        (if r
+            (prio-queue-consolidate q)
+            (setf roots r))
+        (setf top r)
+        (decf count)
+      top-value))))
 
 
-(defmethod prio-queue-list-iterate((elt prio-queue-entry) func)
+(defmethod prio-queue-list-iterate ((elt prio-queue-entry) func)
   "Iterate over double-linked list ELT applying function FUNC to each element"
   (loop for next = elt then (prio-queue-entry-right next)
         for started = nil then t
         until (and started (or (null next) (eq elt next)))
         do (funcall func next)))
 
-
-
+(defmethod prio-queue-consolidate ((q prio-queue))
+  )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tests
