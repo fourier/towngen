@@ -45,9 +45,7 @@ destructively for ENTRY - modifying its left/right pointers"
   (with-slots (child) parent
   (if child 
       (circular-list-append child entry)
-      (setf (circular-list-left entry) entry
-            (circular-list-right entry) entry
-            child entry))))
+      (setf child entry))))
 
 
 ;; priority queue structure
@@ -101,7 +99,7 @@ Complexity: O(1)"
     
     
 (defmethod prio-queue-pop ((q prio-queue))
-  (with-slots (count top) q
+  (with-slots (count top roots) q
     (when top
       (let ((r (circular-list-right top))
             (top-value (circular-list-entry top)))
@@ -115,7 +113,8 @@ Complexity: O(1)"
         ;; remove the top element from roots list
         (prio-queue-roots-remove q top)
         (if (eq r top)
-            (setf top nil)
+            (setf top nil
+                  roots nil)
             (progn
               (setf top r)
               (prio-queue-consolidate q)))
@@ -129,9 +128,11 @@ Complexity: O(1)"
                             (x prio-queue-entry))
   "Remove Y from the root list of Q and make Y a child of X"
   (prio-queue-roots-remove q y)
+  (setf (circular-list-left y) y
+        (circular-list-right y) y)
   (prio-queue-entry-insert-child x y)
   (incf (slot-value x 'degree))
-  (setf (slot-value x 'marked) nil))
+  (setf (slot-value y 'marked) nil))
 
 
 (defmethod prio-queue-consolidate ((q prio-queue))
