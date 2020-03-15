@@ -120,28 +120,23 @@ Complexity: O(1)"
              (setf (prio-queue-entry-parent e) nil))))
         ;; remove the top element from roots list
         (prio-queue-roots-remove q top)
-        (if r
-            (prio-queue-consolidate q)
-            (setf roots r))
-        (setf top r)
+        (if (eq r top)
+            (setf top nil)
+            (progn
+              (setf top r)
+              (prio-queue-consolidate q)))
         (decf count)
       top-value))))
 
 
-;;; (defmethod prio-queue-consolidate ((q prio-queue))
-;;;   (let ((degrees (make-hash-table)))
-;;;     (prio-queue-list-iterate 
-;;;   )))
+(defmethod prio-queue-consolidate ((q prio-queue))
+  (let ((degrees (make-hash-table)))
+))
+
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-
-
-
-
-  
-
 
