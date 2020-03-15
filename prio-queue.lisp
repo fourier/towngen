@@ -1,15 +1,5 @@
 (in-package town-gen)
 
-;; simple tree operations
-(deftype tree () 'list)
-
-(defun make-tree (head &optional (children nil))
-  (cons head children))
-(defun tree-head (tree) (car tree))
-(defun tree-children (tree) (cdr tree))
-(defun tree-add-child (tree child)
-  (cons (car tree) (push child (cdr tree))))
-
 
 ;;----------------------------------------------------------------------------
 ;; Conditions
@@ -50,10 +40,14 @@ initializing the prio-queue-entry and a double-linked list"
 
 (defmethod prio-queue-entry-insert-child ((parent prio-queue-entry)
                                           (entry prio-queue-entry))
-  "Inserts the ENTRY into child list of PARENT, destrictively for ENTRY - modifying its left/right pointers"
-  (if-let (child (slot-value parent 'child))
+  "Inserts the ENTRY into child list of PARENT,
+destructively for ENTRY - modifying its left/right pointers"
+  (with-slots (child) parent
+  (if child 
       (circular-list-append child entry)
-    (setf child entry)))
+      (setf (circular-list-left entry) entry
+            (circular-list-right entry) entry
+            child entry))))
 
 
 ;; priority queue structure
@@ -107,7 +101,7 @@ Complexity: O(1)"
     
     
 (defmethod prio-queue-pop ((q prio-queue))
-  (with-slots (count top roots) q
+  (with-slots (count top) q
     (when top
       (let ((r (circular-list-right top))
             (top-value (circular-list-entry top)))
@@ -129,14 +123,63 @@ Complexity: O(1)"
       top-value))))
 
 
+
+(defmethod prio-queue-link ((q prio-queue)
+                            (y prio-queue-entry)
+                            (x prio-queue-entry))
+  "Remove Y from the root list of Q and make Y a child of X"
+  (prio-queue-roots-remove q y)
+  (prio-queue-entry-insert-child x y)
+  (incf (slot-value x 'degree))
+  (setf (slot-value x 'marked) nil))
+
+
 (defmethod prio-queue-consolidate ((q prio-queue))
-  (let ((degrees (make-hash-table)))
-))
-
-
+  (with-slots (count test-function top) q
+    (flet ((cmp (x y)
+             (funcall test-function
+                      (circular-list-entry x)
+                      (circular-list-entry y))))
+      (let ((degrees (make-hash-table))
+            (nodes))
+        ;; collect NODES = copy of the roots list, which
+        ;; will be destructively traversed below
+        (circular-list-iterate (slot-value q 'roots)
+                               (lambda (e) (push e nodes)))
+        ;; iterate oven each root of the prio queue
+        (loop for w in nodes
+              for x = w
+              for d = (prio-queue-entry-degree x)
+              do 
+              (loop for y = (gethash d degrees)
+                    while y
+                    when (cmp x y)
+                    do
+                    (let ((tmp x)) (setf x y y tmp))
+                    end
+                    do
+                    (prio-queue-link q y x)
+                    (remhash d degrees)
+                    (incf d))
+              (setf (gethash d degrees) x))
+        (setf top nil)
+        (loop for v being the hash-value of degrees
+              when (or (null top)
+                       (cmp v top))
+              do (setf top v))))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(defun test-prio-queue-pop ()
+  (let ((q (make-instance 'prio-queue)))
+    (loop for i in '(15 10 20 18)
+          do (prio-queue-push q i))
+    (loop with expected = (list 10 15 18 20)
+          for j below 2
+          for x = (prio-queue-pop q)
+          for y = (pop expected)
+          while expected
+          do (assert (equal x y)))))
