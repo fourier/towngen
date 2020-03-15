@@ -14,6 +14,7 @@
   :license ""
   :depends-on (alexandria cmu-infix ppath)
   :components ((:file "package")
+               (:file "circular-list")
                (:file "prio-queue")
                (:file "voronoi"))
   :description "")

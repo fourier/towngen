@@ -171,8 +171,10 @@ Complexity: O(1)"
         until (and started (or (null next) (eq elt next)))
         do (funcall func next)))
 
-(defmethod prio-queue-consolidate ((q prio-queue))
-  )
+;;; (defmethod prio-queue-consolidate ((q prio-queue))
+;;;   (let ((degrees (make-hash-table)))
+;;;     (prio-queue-list-iterate 
+;;;   )))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tests
