@@ -98,13 +98,35 @@ Returns the updated START element"
           (funcall func next))))
 
 
+(defun circular-list-find (self pred)
+  "Find and return the list SELF element satisfying the
+predicate PRED.
+Return nil if not found"
+  (when self
+    (loop for started = nil then t
+          for next = self then (circular-list-right next)
+          for satisfies =
+          (funcall pred (circular-list-entry next))
+          until (or satisfies
+                    (and started (eq next self)))
+          finally
+          (return (if satisfies next nil)))))
+
+
+(defmethod circular-list-to-list ((self circular-list))
+  "Collect entries from the circular list to a normal list
+and return it"
+  (let (result)
+    (circular-list-iterate self
+                           (lambda (e) (push e result)))
+    (nreverse result)))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Tests
 
 
-(defun test-circlular-add-iterate ()
+(defun test-circular-add-iterate ()
   ;; test that iterate through the list with one entry
   ;; and left/right pointers works
   (let ((lst (make-instance 'circular-list :entry 10))
@@ -133,7 +155,7 @@ Returns the updated START element"
     (assert (= count (1+ (length data))))
     (assert (equal expected-list (nreverse result)))))
 
-(defun test-circlular-list-remove ()
+(defun test-circular-list-remove ()
   ;; test remove the element from the middle
   (let ((q (make-instance 'circular-list :entry 10))
         (result))
@@ -159,14 +181,12 @@ Returns the updated START element"
     (circular-list-iterate q (lambda (e)
                                (push (circular-list-entry e)
                                      result)))
-    (print result)
     (assert (equal '(10 20) (nreverse result))))
   ;; test removal of the head of the list
   (let ((q (make-instance 'circular-list :entry 10))
         (result))
     (circular-list-append-entry q 20)
     (circular-list-append-entry q 30)
-    ;; BUG
     (setq q (circular-list-remove q q))
     (circular-list-iterate q (lambda (e)
                                (push (circular-list-entry e)
@@ -180,3 +200,24 @@ Returns the updated START element"
                                (push (circular-list-entry e)
                                      result)))
     (assert (null result))))
+
+(defun test-circular-list-find ()
+  (let ((l (make-instance 'circular-list :entry 10)))
+    (loop for e in '(20 30 40) do
+          (circular-list-append-entry l e))
+    ;; test if find works
+    (loop for e in '(20 30 40) do
+          (assert (= (circular-list-entry
+                      (circular-list-find l (curry #'= e)))
+                     e)))
+    ;; now test if not found
+    (assert (null (circular-list-find l (curry #'= 50))))))
+
+(defun test-circular-list-to-list ()
+  (let ((l (make-instance 'circular-list :entry 10)))
+    (loop for e in '(20 30 40) do
+          (circular-list-append-entry l e))
+    (assert (equal '(10 20 30 40)
+                   (mapcar #'circular-list-entry (circular-list-to-list l))))))
+  
+      

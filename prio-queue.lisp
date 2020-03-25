@@ -50,10 +50,19 @@ destructively for ENTRY - modifying its left/right pointers"
 
 ;; priority queue structure
 (defclass prio-queue ()
-  ((top :initform nil :type prio-queue-entry :documentation "A top (min) element of the priority queue")                  
-   (roots :initform nil :type prio-queue-entry :documentation "A double-linked list of prio-queue elements")
-   (count :initform 0 :type fixnum :documentation "Total amount of elements in the queue")
-   (test-function :initarg :test :initform #'> :reader prio-queue-test-function :documentation "Test function for elements")))
+  ((top :initform nil
+        :type prio-queue-entry
+        :documentation "A top (min) element of the priority queue")
+   (roots :initform nil
+          :type prio-queue-entry
+          :documentation "A double-linked list of prio-queue elements")
+   (count :initform 0
+          :type fixnum
+          :documentation "Total amount of elements in the queue")
+   (test-function :initarg :test
+                  :initform #'>
+                  :reader prio-queue-test-function
+                  :documentation "Test function for elements")))
 
 
 (defmethod prio-queue-top ((q prio-queue))
@@ -105,11 +114,12 @@ Complexity: O(1)"
             (top-value (circular-list-entry top)))
         ;; move all children to the roots list
         (when-let (child (prio-queue-entry-child top))
-          (circular-list-iterate
-           child
+          (mapcar  
            (lambda (e)
+             (format t "inserting ~a to the queue~%" e)
              (prio-queue-roots-insert q e)
-             (setf (prio-queue-entry-parent e) nil))))
+             (setf (prio-queue-entry-parent e) nil))
+           (circular-list-to-list child)))
         ;; remove the top element from roots list
         (prio-queue-roots-remove q top)
         (if (eq r top)
@@ -143,30 +153,35 @@ Complexity: O(1)"
                       (circular-list-entry y))))
       (let ((degrees (make-hash-table))
             (nodes))
-        ;; collect NODES = copy of the roots list, which
-        ;; will be destructively traversed below
+        ;; collect NODES = copy of the roots list, as
+        ;; it will be destructively traversed below
         (circular-list-iterate (slot-value q 'roots)
                                (lambda (e) (push e nodes)))
-        ;; iterate oven each root of the prio queue
+        ;; iterate oven each root of the prio queue,
         (loop for w in nodes
               for x = w
               for d = (prio-queue-entry-degree x)
+              ;; merge the trees of the same height,
+              ;; placing the one with bigger value
+              ;; as a child
               do 
               (loop for y = (gethash d degrees)
                     while y
                     when (cmp x y)
                     do
-                    (let ((tmp x)) (setf x y y tmp))
+                    (rotatef x y)
                     end
                     do
                     (prio-queue-link q y x)
                     (remhash d degrees)
                     (incf d))
               (setf (gethash d degrees) x))
+        ;; now update the top, going through the list of
+        ;; roots
         (setf top nil)
         (loop for v being the hash-value of degrees
               when (or (null top)
-                       (cmp v top))
+                       (cmp top v))
               do (setf top v))))))
 
 
@@ -174,13 +189,58 @@ Complexity: O(1)"
 ;; tests
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; test prio-queue-pop for a pre-constructed prio queue
+;; from http://staff.ustc.edu.cn/~csli/graduate/algorithms/book6/chap21.htm
+
+(defun test-prio-queue-pop-complex ()
+  (let ((q (make-instance 'prio-queue)))
+    ;; fill the roots
+    (loop for i in '(23 7 21 3 17 24)
+          do (prio-queue-push q i))
+    ;; add the childred to topmost element 3
+    (let ((top (slot-value q 'top)))
+      (loop for i in '(18 52 38)
+            do
+            (prio-queue-entry-insert-child top (mkentry i)))
+      ;; add child to 18
+      (prio-queue-entry-insert-child
+       (circular-list-find (prio-queue-entry-child top)
+                           (curry #'= 18))
+       (mkentry 39))
+      ;; add child to 38
+      (prio-queue-entry-insert-child
+       (circular-list-find (prio-queue-entry-child top)
+                           (curry #'= 38))
+       (mkentry 41)))
+    ;; add child to topmost element 17
+    (let ((roots (slot-value q 'roots)))
+      (prio-queue-entry-insert-child
+       (circular-list-find roots (curry #'= 17))
+       (mkentry 30))
+      ;; add children to topmost element 24
+      (let ((el24 (circular-list-find roots (curry #'= 24))))
+        (loop for e in '(26 46)
+              do
+              (prio-queue-entry-insert-child el24
+                                             (mkentry e)))
+        ;; add child to element 26
+        (prio-queue-entry-insert-child
+         (circular-list-find (prio-queue-entry-child el24)
+                             (curry #'= 26))
+         (mkentry 35))))
+    ;; now to the test
+    q))
+
 (defun test-prio-queue-pop ()
   (let ((q (make-instance 'prio-queue)))
     (loop for i in '(15 10 20 18)
           do (prio-queue-push q i))
     (loop with expected = (list 10 15 18 20)
-          for j below 2
+          for j below 3
           for x = (prio-queue-pop q)
           for y = (pop expected)
           while expected
-          do (assert (equal x y)))))
+          do
+          (print y)
+          (assert (equal x y)))))
+
