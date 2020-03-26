@@ -13,6 +13,7 @@
   (:documentation "Circular list class"))
 
 (defmethod print-object ((self circular-list) stream)
+  "Printer for CIRCULAR-LIST object"
   (format stream "'~a' <- '~a' -> '~a'~%"
           (when (circular-list-left self)
             (circular-list-entry (circular-list-left self)))
@@ -30,6 +31,8 @@ the pointers to the left/right elements to self"
 
 (defmethod circular-list-append-entry ((self circular-list)
                                        entry)
+  "Insert the entry ENTRY to the end of the list.
+Here ENTRY is a value, not circula-list-entry"
   (circular-list-append self
                         (make-instance 'circular-list :entry entry)))
 
@@ -90,6 +93,7 @@ Returns the updated START element"
                                       
 
 (defun circular-list-iterate (self func)
+  "Apply function FUNC to every element of the circular list SELF"
   (when self
     (loop for started = nil then t
           for next = self then (circular-list-right next)

@@ -79,7 +79,10 @@ destructively for ENTRY - modifying its left/right pointers"
           (terpri stream))
         (format stream "No roots~%")))
   (values))
-        
+
+(defmethod print-object ((self prio-queue) stream)
+  "Default printer for PRIO-QUEUE object"
+  (prio-queue-print self stream))
 
 (defmethod prio-queue-top ((q prio-queue))
   "Returns the value of the top element of the tree.
@@ -110,14 +113,9 @@ Complexity: O(1)"
   "Insert an entry into the right of the roots list"
   (with-slots (roots) q
     (if (null roots)
-        (progn
-          (format t "roots are empty, set entry ~a as roots~%" entry)
-        (setf roots entry))
-        (progn
-          (format t "roots are not empty, add ~a to roots ~a~%"
-                  entry roots)
+        (setf roots entry)
         ;; otherwise add to the right of the roots list
-        (circular-list-append roots entry)))))
+        (circular-list-append roots entry))))
 
 
 (defmethod prio-queue-roots-remove ((q prio-queue) (el prio-queue-entry))
@@ -129,28 +127,31 @@ Complexity: O(1)"
     
     
 (defmethod prio-queue-pop ((q prio-queue))
+  "Pop the priority queue element. Returns nil if no elements
+in the queue"
   (with-slots (count top roots) q
     (when top
-      (let ((r (circular-list-right top))
-            (top-value (circular-list-entry top)))
+      (let ((top-value (circular-list-entry top)))
         ;; move all children to the roots list
         (when-let (child (prio-queue-entry-child top))
           (mapcar  
            (lambda (e)
-             (format t "inserting ~a to the queue~%" e)
              (prio-queue-roots-insert q e)
              (setf (prio-queue-entry-parent e) nil))
            (circular-list-to-list child)))
         ;; remove the top element from roots list
         (prio-queue-roots-remove q top)
-        (if (eq r top)
-            (setf top nil
-                  roots nil)
-            (progn
-              (setf top r)
-              (prio-queue-consolidate q)))
+        ;; if it was the last element in the queue,
+        ;; just empty it
+        (let ((r (circular-list-right top)))
+          (if (eq top r)
+              (setf top nil
+                    roots nil)
+              (progn
+                (setf top r)
+                (prio-queue-consolidate q))))
         (decf count)
-      top-value))))
+        top-value))))
 
 
 
@@ -167,6 +168,9 @@ Complexity: O(1)"
 
 
 (defmethod prio-queue-consolidate ((q prio-queue))
+  "Consolidate the priority queue. Make no
+subtrees of the same degree in the list of ROOTS,
+and update the TOP element"
   (with-slots (count test-function top) q
     (flet ((cmp (x y)
              (funcall test-function
@@ -251,33 +255,35 @@ Complexity: O(1)"
                              (curry #'= 26))
          (mkentry 35))))
     ;; now to the test
-    q))
+    (loop with expected = (list 3 7 17 18 21 23 24 26 30 35 38 39 41 46 52)
+          for x = (prio-queue-pop q)
+          for y = (pop expected)
+          while expected
+          do
+          (assert (equal x y)))))
+          
 
 (defun test-prio-queue-pop ()
   (let ((q (make-instance 'prio-queue)))
     (loop for i in '(15 10 20 18)
           do (prio-queue-push q i))
     (loop with expected = (list 10 15 18 20)
-          for j below 3
           for x = (prio-queue-pop q)
           for y = (pop expected)
           while expected
           do
-          (print y)
           (assert (equal x y)))))
 
 
 (defun test-prio-queue-pop-random ()
-  (let* ((count 3)
+  (let* ((count 50)
          (data (shuffle (iota count)))
         (q (make-instance 'prio-queue)))
-    (print data)
     (loop for i in data 
           do (prio-queue-push q i))
-    q))
-;;;     (let ((popped
-;;;            (loop with p = (prio-queue-pop q)
-;;;                  while p
-;;;                  collect p)))
-;;;       (assert (equal (iota count) popped)))))
+    (let ((popped
+           (loop for p = (prio-queue-pop q)
+                 while p
+                 collect p)))
+      (assert (equal (iota count) popped)))))
 ;;;     
