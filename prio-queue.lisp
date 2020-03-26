@@ -64,6 +64,22 @@ destructively for ENTRY - modifying its left/right pointers"
                   :reader prio-queue-test-function
                   :documentation "Test function for elements")))
 
+(defmethod prio-queue-print ((q prio-queue) &optional (stream t))
+  "Print the priority queue Q to the stream STREAM"
+  (with-slots (top roots) q
+    (if top (format stream "Top: ~a~%" (circular-list-entry top))
+        (format stream "Empty top~%"))
+    (if roots
+        (progn
+          (format stream "Roots: ")
+          (circular-list-iterate
+           roots
+           (lambda (e)
+             (format stream "~a " (circular-list-entry e))))
+          (terpri stream))
+        (format stream "No roots~%")))
+  (values))
+        
 
 (defmethod prio-queue-top ((q prio-queue))
   "Returns the value of the top element of the tree.
@@ -94,9 +110,14 @@ Complexity: O(1)"
   "Insert an entry into the right of the roots list"
   (with-slots (roots) q
     (if (null roots)
-        (setf roots entry)
+        (progn
+          (format t "roots are empty, set entry ~a as roots~%" entry)
+        (setf roots entry))
+        (progn
+          (format t "roots are not empty, add ~a to roots ~a~%"
+                  entry roots)
         ;; otherwise add to the right of the roots list
-        (circular-list-append roots entry))))
+        (circular-list-append roots entry)))))
 
 
 (defmethod prio-queue-roots-remove ((q prio-queue) (el prio-queue-entry))
@@ -151,6 +172,7 @@ Complexity: O(1)"
              (funcall test-function
                       (circular-list-entry x)
                       (circular-list-entry y))))
+
       (let ((degrees (make-hash-table))
             (nodes))
         ;; collect NODES = copy of the roots list, as
@@ -244,3 +266,18 @@ Complexity: O(1)"
           (print y)
           (assert (equal x y)))))
 
+
+(defun test-prio-queue-pop-random ()
+  (let* ((count 3)
+         (data (shuffle (iota count)))
+        (q (make-instance 'prio-queue)))
+    (print data)
+    (loop for i in data 
+          do (prio-queue-push q i))
+    q))
+;;;     (let ((popped
+;;;            (loop with p = (prio-queue-pop q)
+;;;                  while p
+;;;                  collect p)))
+;;;       (assert (equal (iota count) popped)))))
+;;;     

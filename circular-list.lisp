@@ -84,8 +84,8 @@ Returns the updated START element"
         (t (let ((prev (circular-list-left other))
                  (next (circular-list-right other)))
              (setf (circular-list-right prev) next
-                   (circular-list-left next) prev))
-           start)))
+                   (circular-list-left next) prev)
+             start))))
                  
                                       
 
