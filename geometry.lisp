@@ -1,3 +1,9 @@
+;;; geometry.lisp --- Geometric primitives and functions
+
+;; Copyright (C) 2020 Alexey Veretennikov
+;;
+;; Author: Alexey Veretennikov <alexey dot veretennikov at gmail dot com>
+
 (in-package town-gen)
 
 ;; enable infix syntax reader 

@@ -1,8 +1,8 @@
-#|
-  This file is a part of towngen project.
+;;; package.lisp --- package definition
 
-  (C) COPYRIGHT Alexey Veretennikov<alexey.veretennikov@gmail.com>, 2020
-|#
+;; Copyright (C) 2020 Alexey Veretennikov
+;;
+;; Author: Alexey Veretennikov <alexey dot veretennikov at gmail dot com>
 
 (in-package :cl-user)
 

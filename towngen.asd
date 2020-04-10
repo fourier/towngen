@@ -1,7 +1,7 @@
 #|
   This file is a part of towngen project.
 
-  (C) COPYRIGHT Alexey Veretennikov<alexey.veretennikov@gmail.com>, 2019
+  (C) COPYRIGHT Alexey Veretennikov<alexey.veretennikov@gmail.com>, 2019-2020
 |#
 (in-package :cl-user)
 (defpackage towngen-asd
@@ -16,6 +16,7 @@
   :components ((:file "package")
                (:file "geometry")
                (:file "arc")
+               (:file "btree")
                (:file "circular-list")
                (:file "prio-queue")
                (:file "voronoi"))
