@@ -14,6 +14,8 @@
   :license ""
   :depends-on (alexandria cmu-infix ppath)
   :components ((:file "package")
+               (:file "geometry")
+               (:file "arc")
                (:file "circular-list")
                (:file "prio-queue")
                (:file "voronoi"))
