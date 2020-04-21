@@ -98,51 +98,44 @@ SELECTOR (i.e. btree-right or btree-left or btree-parent), until
 the last element reached with no possible SELECTOR or
 STOP-THEN returned T.
 The STOP-THEN is a boolean function accepting 2 arguments:
-current element and previous element."
-  (loop with prev = btree
-        for node = (funcall selector prev)
+current element and previous element.
+Return: (values NODE PREVIOUS STOPPED)
+Here NODE is the last node traversed
+PREVIOUS is the previous node,
+STOP-THEN is a boolean flag indicating if the iteration
+prematurely stopped"
+  (loop for node = btree then (funcall selector node)
+        and prev = node
+        and prev2 = prev
         while node
         when (funcall stop-then node prev)
         do
-        (format t "node ~a satisfies condition~%" node)
-        (return node)
+        (return (values node prev t))
         end
-        do
-        (format t "node: ~a prev: ~a~%"
-                (btree-value node)
-                (btree-value prev))
-        (setf prev node)
-        finally (return prev)))
+        finally (return (values prev prev2 nil))))
         
 
 (defmethod btree-find-neighbor ((btree btree) selector1 selector2)
   (with-slots (parent) btree
     ;; only do search if its a leaf and it has a parent
     (when (and (btree-leaf-p btree) parent)
-      ;; save the previous traversed element
-      ;; to avoid false turning point
-      (let ((prev btree))
-        (flet ((stop-criteria (n p)
-                 ;; stop on nil
-                 (or (not n)
-                     ;; othewise
-                     (let ((s (funcall selector1 n)))
-                       (or (and s (not (eq s prev)))
-                           (null (setf prev n)))))))
+      (flet ((stop-criteria (n p)
+               ;; stop on nil
+               (or (not n)
+                   ;; othewise check if the another branch
+                   ;; is not the previous
+                   (when-let ((s (funcall selector1 n)))
+                     (not (eq s p))))))
           ;; find the first parent which has left/right subtree
           ;; not equal to us
-          (when-let* ((common-parent
-                       (btree-crawl btree #'btree-parent
-                                    #'stop-criteria))
-                      (subtree (funcall selector1 common-parent)))
+          (multiple-value-bind (common-parent prev)
+              (btree-crawl btree #'btree-parent #'stop-criteria)
+            (subtree (funcall selector1 common-parent)))
             (format t "Start crawl down at ~a~%"
                     (btree-value common-parent))
-            (format t "Previous ~a~%"
-                    (btree-value prev))
-            (unless (eq subtree prev)
             ;; now got by the opposite branch of the subtree
             ;; of the common parent
-            (btree-crawl subtree selector2))))))))
+            (btree-crawl subtree selector2))))))
         
 (defmethod btree-find-left-neighbor ((btree btree))
   (btree-find-neighbor btree #'btree-left #'btree-right))
