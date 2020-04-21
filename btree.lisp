@@ -108,11 +108,12 @@ prematurely stopped"
         and prev = node
         and prev2 = prev
         while node
-        when (funcall stop-then node prev)
+        for r = (funcall stop-then node prev)
+        when r
         do
-        (return (values node prev t))
+        (return (values node prev r))
         end
-        finally (return (values prev prev2 nil))))
+        finally (return (values prev prev2 r))))
         
 
 (defmethod btree-find-neighbor ((btree btree) selector1 selector2)
@@ -128,7 +129,7 @@ prematurely stopped"
                      (not (eq s p))))))
           ;; find the first parent which has left/right subtree
           ;; not equal to us
-          (multiple-value-bind (common-parent prev)
+          (multiple-value-bind (common-parent prev found)
               (btree-crawl btree #'btree-parent #'stop-criteria)
             (subtree (funcall selector1 common-parent)))
             (format t "Start crawl down at ~a~%"
