@@ -90,41 +90,59 @@ Returns the new root if necessary"
 
 (defmethod btree-crawl ((btree btree) selector
                         &optional (stop-then
-                                   (lambda (x)
-                                     (declare (ignore x))
+                                   (lambda (x prev)
+                                     (declare (ignore x prev))
                                      nil)))
   "Climb the binary tree from current node using specified
 SELECTOR (i.e. btree-right or btree-left or btree-parent), until
 the last element reached with no possible SELECTOR or
-STOP-THEN returned T"
+STOP-THEN returned T.
+The STOP-THEN is a boolean function accepting 2 arguments:
+current element and previous element."
   (loop with prev = btree
-        for node =  (funcall selector prev)
+        for node = (funcall selector prev)
         while node
-        when (funcall stop-then node)
+        when (funcall stop-then node prev)
         do
         (format t "node ~a satisfies condition~%" node)
         (return node)
         end
         do
-        (format t "node: ~a prev: ~a~%" node prev)
+        (format t "node: ~a prev: ~a~%"
+                (btree-value node)
+                (btree-value prev))
         (setf prev node)
         finally (return prev)))
         
 
 (defmethod btree-find-neighbor ((btree btree) selector1 selector2)
   (with-slots (parent) btree
+    ;; only do search if its a leaf and it has a parent
     (when (and (btree-leaf-p btree) parent)
-      ;; find the first parent which has left/right subtree
-      ;; not equal to us
-      (when-let ((common-parent
-                  (btree-crawl btree #'btree-parent
-                               (lambda (n)
-                                 (when-let (s (funcall selector1 n))
-                                   (not (eq s btree)))))))
-        ;; now got by the opposite branch of the subtree
-        ;; of the common parent
-        (btree-crawl (funcall selector1 common-parent)
-                     selector2)))))
+      ;; save the previous traversed element
+      ;; to avoid false turning point
+      (let ((prev btree))
+        (flet ((stop-criteria (n p)
+                 ;; stop on nil
+                 (or (not n)
+                     ;; othewise
+                     (let ((s (funcall selector1 n)))
+                       (or (and s (not (eq s prev)))
+                           (null (setf prev n)))))))
+          ;; find the first parent which has left/right subtree
+          ;; not equal to us
+          (when-let* ((common-parent
+                       (btree-crawl btree #'btree-parent
+                                    #'stop-criteria))
+                      (subtree (funcall selector1 common-parent)))
+            (format t "Start crawl down at ~a~%"
+                    (btree-value common-parent))
+            (format t "Previous ~a~%"
+                    (btree-value prev))
+            (unless (eq subtree prev)
+            ;; now got by the opposite branch of the subtree
+            ;; of the common parent
+            (btree-crawl subtree selector2))))))))
         
 (defmethod btree-find-left-neighbor ((btree btree))
   (btree-find-neighbor btree #'btree-left #'btree-right))
@@ -146,8 +164,9 @@ Prints output to the stream STREAM"
   (labels ((p (b)
            (with-slots (parent left right value) b
              (if parent
-                 (format stream "    ~a -> ~a;~%"
-                         (btree-value parent) value )
+                 (format stream "    ~a -> ~a~%~a~:[~;[style=filled,color=\"0 0 0.7\"]~];~%"
+                         (btree-value parent) value value
+                         (btree-leaf-p b))
                  (format stream "    ~a;~%" value))
              (when left (p left))
              (when right (p right)))))
@@ -173,6 +192,20 @@ Prints output to the stream STREAM"
     (setf b (btree-insert b 1))
     (setf b (btree-insert b 2))
     (setf b (btree-insert b 5))
+    b))
+
+
+(defun test-btree2 ()
+  (let ((b (make-instance 'btree :value 20)))
+    (setf b (btree-insert b 11))
+    (setf b (btree-insert b 14))
+    (setf b (btree-insert b 17))
+    (setf b (btree-insert b 13))
+    (setf b (btree-insert b 19))
+    (setf b (btree-insert b 15))
+    (setf b (btree-insert b 5))
+    (setf b (btree-insert b 2))
+    (setf b (btree-insert b 18))
     b))
 
 (defun btree-dot1 (btree)
