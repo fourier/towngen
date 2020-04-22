@@ -117,6 +117,9 @@ prematurely stopped"
         
 
 (defmethod btree-find-neighbor ((btree btree) selector1 selector2)
+  "Find the neighbor for the BTREE on the SELECTOR1 from
+the element. SELECTOR2 is another selector.
+SELECTOR1/2 could be #'btree-left/right"
   (with-slots (parent) btree
     ;; only do search if its a leaf and it has a parent
     (when (and (btree-leaf-p btree) parent)
@@ -127,16 +130,16 @@ prematurely stopped"
                    ;; is not the previous
                    (when-let ((s (funcall selector1 n)))
                      (not (eq s p))))))
-          ;; find the first parent which has left/right subtree
-          ;; not equal to us
-          (multiple-value-bind (common-parent prev found)
-              (btree-crawl btree #'btree-parent #'stop-criteria)
-            (subtree (funcall selector1 common-parent)))
-            (format t "Start crawl down at ~a~%"
-                    (btree-value common-parent))
-            ;; now got by the opposite branch of the subtree
+        ;; find the first parent which has left/right subtree
+        ;; not equal to us
+        (multiple-value-bind (common-parent prev found)
+            (btree-crawl btree #'btree-parent #'stop-criteria)
+          (declare (ignore prev))
+          (when found 
+            ;; now go down by the opposite branch of the subtree
             ;; of the common parent
-            (btree-crawl subtree selector2))))))
+            (btree-crawl (funcall selector1 common-parent)
+                         selector2)))))))
         
 (defmethod btree-find-left-neighbor ((btree btree))
   (btree-find-neighbor btree #'btree-left #'btree-right))
@@ -188,8 +191,7 @@ Prints output to the stream STREAM"
     (setf b (btree-insert b 5))
     b))
 
-
-(defun test-btree2 ()
+(defun test-btree2-make ()
   (let ((b (make-instance 'btree :value 20)))
     (setf b (btree-insert b 11))
     (setf b (btree-insert b 14))
@@ -202,6 +204,22 @@ Prints output to the stream STREAM"
     (setf b (btree-insert b 18))
     b))
 
-(defun btree-dot1 (btree)
-  (with-open-file (s "C:/Sources/lisp/towngen/graph1.gv" :direction :output :if-exists :supersede)
-    (btree-dot btree s)))
+(defun test-btree2 ()
+  (let* ((tree (test-btree2-make))
+         (leftmost (btree-crawl tree #'btree-left))
+         (rightmost (btree-crawl tree #'btree-right))
+         (lst '(2 5 11 13 14 15 17 18 19 20)))
+    (assert (equal lst
+                   (loop for n = leftmost then (btree-find-right-neighbor n)
+                         and p = n
+                         while n
+                         collect (values (btree-value n) p))))
+
+    (assert (equal (nreverse (copy-list lst))
+                   (loop for n = rightmost then (btree-find-left-neighbor n)
+                         and p = n
+                         while n
+                         collect (values (btree-value n) p))))))
+
+
+    
