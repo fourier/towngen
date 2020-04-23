@@ -142,18 +142,37 @@ SELECTOR1/2 could be #'btree-left/right"
                          selector2)))))))
         
 (defmethod btree-find-left-neighbor ((btree btree))
+  "Find the left leaf neighbor of the leaf BTREE."
   (btree-find-neighbor btree #'btree-left #'btree-right))
 
 (defmethod btree-find-right-neighbor ((btree btree))
+  "Find the right leaf neighbor of the leaf BTREE."
   (btree-find-neighbor btree #'btree-right #'btree-left))
 
 
-(defmethod btree-remove ((btree btree))
-  "Remove the node from the binary tree"
-  (with-slots (left right parent) btree
+(defmethod btree-remove-leaf ((btree btree))
+  "Remove the leaf node from the binary tree"
+  (with-slots (parent) btree
     (unless (or (null parent) ; only if not root of the tree
                 (not (btree-leaf-p btree))) ; and a leaf
-      )))
+      (let ((pparent (btree-parent parent))
+            (sibling (if (eq (btree-left parent) btree)
+                         (btree-right parent)
+                         (btree-left parent))))
+        ;; update the parent of the sibling to one
+        ;; level up
+        (setf (btree-parent sibling) pparent)
+        ;; promote the sibling up one level
+        (when pparent
+            ;; if our parent is left branch, replace
+            ;; our parent with sibling
+            (if (eq (btree-left pparent) parent)
+                (setf (btree-left pparent) sibling)
+                ;; otherwise do it with right branch
+                (setf (btree-right pparent) sibling)))
+        ;; disconnect the leaf
+        (setf parent nil)))))
+        
 
 (defmethod btree-dot ((btree btree) &optional (stream t))
   "Generate the DOT syntax for drawing the binary tree.
@@ -221,5 +240,6 @@ Prints output to the stream STREAM"
                          while n
                          collect (values (btree-value n) p))))))
 
-
-    
+(defun btree-dot1 (btree)
+  (with-open-file (s "C:/Sources/lisp/towngen/graph1.gv" :direction :output :if-exists :supersede)
+    (btree-dot btree s)))
