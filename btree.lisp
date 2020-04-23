@@ -169,7 +169,15 @@ SELECTOR1/2 could be #'btree-left/right"
             (if (eq (btree-left pparent) parent)
                 (setf (btree-left pparent) sibling)
                 ;; otherwise do it with right branch
-                (setf (btree-right pparent) sibling)))
+                (setf (btree-right pparent) sibling))
+            ;; update the pparent value - if both
+            ;; its left and right values are leafs
+            (when (and (btree-leaf-p (btree-left pparent))
+                       (btree-leaf-p (btree-right pparent)))
+              (setf (slot-value pparent 'value)
+                    (funcall (btree-divider pparent)
+                             (btree-value (btree-left pparent))
+                             (btree-value (btree-right pparent))))))
         ;; disconnect the leaf
         (setf parent nil)))))
         
