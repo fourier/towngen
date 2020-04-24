@@ -44,6 +44,8 @@
   ;; create a priority queue
   (with-slots (nodes queue) self
     (unless nodes (error "No nodes in Voronoin diagram"))
+    ;; Push to the priority queue all nodes sorting
+    ;; by Y coordinate
     (setf queue (make-instance 'prio-queue
                                :test
                                (lambda (a b)
@@ -71,9 +73,14 @@ No generation performed yet"
   "Handle node event of the Voronoi diagram"
     (format t "Node event: ~a~%" point)
     (with-slots (beachline) self
-    (if (null beachline)
-        (setf beachline (make-btree point))
-        nil)))
+      (if (null beachline)
+          ;; create the first element in binary tree
+          (setf beachline (make-btree point))
+          ;; insert into the beach line
+          (multiple-value-bind (new-root new-node)
+              (btree-insert beachline point)
+            (setf beachline root)
+            ;; check for events of the circle
                                             
 
 
@@ -83,6 +90,9 @@ No generation performed yet"
   (with-slots (nodes queue) self
     (loop for evt = (prio-queue-pop queue)
           while evt
+          ;; pickup the event from the queue
+          ;; the handle-voronoi-queue-event will
+          ;; dispatch by event type
           do (handle-voronoi-queue-event self evt)))
   self)
 

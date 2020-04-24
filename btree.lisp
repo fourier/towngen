@@ -59,9 +59,9 @@ as old but with a new value"
 
 (defmethod btree-insert ((btree btree) new-value)
   "Insert the VALUE into the binary tree.
-Returns the new root if necessary"
+Returns the values: (new root (if necessary), new node)"
   ;; decide where to put, left or right
-  (with-slots (left right value) btree
+  (with-slots (value) btree
     ;; case the first root
     (if (btree-leaf-p btree)
         ;; new root
@@ -80,14 +80,15 @@ Returns the new root if necessary"
               ;; or add to left
               (setf (btree-left new-root) btree
                     (btree-right new-root) new-leaf))
-              new-root)
+          (values new-root new-leaf))
         ;; the tree has other nodes, find the closest one
-        (progn 
-          (if (btree-< btree new-value)
-              (setf right (btree-insert right new-value))
-              (setf left (btree-insert left new-value)))
-          btree))))
-
+        (let ((leaf-symbol
+               (if (btree-< btree new-value) 'right 'left)))
+          (multiple-value-bind (new-root new-node)
+              (btree-insert (slot-value btree leaf-symbol) new-value)
+            (setf (slot-value btree leaf-symbol) new-root)
+            (values btree new-node))))))
+    
 (defmethod btree-crawl ((btree btree) selector
                         &optional (stop-then
                                    (lambda (x prev)
