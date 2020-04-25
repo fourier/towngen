@@ -97,26 +97,37 @@ given triangle"
         (and (equals p1 a) (equals p3 b)))))
 
 
+(defun circumcenter-points (p1 p2 p3)
+  "Circumcenter of the triangle.
+See https://en.wikipedia.org/wiki/Circumscribed_circle#Cartesian_coordinates_2
+for details.
+Return values (circumcenter, radius), or nil if the points
+are collinear"
+  (with-coords (p1 p2 p3)
+    (let ((d #I(2*(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2)))))
+      (if (> (abs d) *point-precision*)
+          (let ((cx
+                 #I(((x1^^2 + y1^^2) * (y2-y3) +
+                     (x2^^2 + y2^^2) * (y3-y1) +
+                     (x3^^2 + y3^^2) * (y1-y2)) / d))
+                (cy
+                 #I(((x1^^2 + y1^^2) * (x3-x2) +
+                     (x2^^2 + y2^^2) * (x1-x3) +
+                     (x3^^2 + y3^^2) * (x2-x1)) / d)))
+            (let* ((c (make-point :x cx :y cy))
+                   (r (distance c p1)))
+              (values c r)))
+          (values)))))
+
 (defmethod circumcenter ((triangle triangle))
   "Circumcenter of the triangle.
 See https://en.wikipedia.org/wiki/Circumscribed_circle#Cartesian_coordinates_2
 for details.
 Return values (circumcenter, radius)"
   (with-slots (p1 p2 p3 c r) triangle
-    (with-coords (p1 p2 p3)
-      (let* ((d #I(2*(x1*(y2-y3) + x2*(y3-y1) + x3*(y1-y2))))
-             (cx
-               #I(((x1^^2 + y1^^2) * (y2-y3) +
-                   (x2^^2 + y2^^2) * (y3-y1) +
-                   (x3^^2 + y3^^2) * (y1-y2)) / d))
-             (cy
-               #I(((x1^^2 + y1^^2) * (x3-x2) +
-                   (x2^^2 + y2^^2) * (x1-x3) +
-                   (x3^^2 + y3^^2) * (x2-x1)) / d)))
-        (setf c (make-point :x cx :y cy)
-              r (distance c p1))
-        (values c r)))))
-
+    (multiple-value-bind (cc rr)
+        (circumcenter-points p1 p2 p3)
+      (setf c cc r rr))))
 
 (defmethod in-circumcircle-p ((triangle triangle) (p point))
   "Determines if the point p is in the circumcircle of the
