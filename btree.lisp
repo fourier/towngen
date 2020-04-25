@@ -6,6 +6,8 @@
 
 (in-package town-gen)
 
+(declaim (optimize (debug 3)))
+
 (defclass btree ()
   ((value :initarg :value
           :reader btree-value
@@ -189,10 +191,10 @@ Prints output to the stream STREAM"
   (labels ((p (b)
            (with-slots (parent left right value) b
              (if parent
-                 (format stream "    ~a -> ~a~%~a~:[~;[style=filled,color=\"0 0 0.7\"]~];~%"
+                 (format stream "    \"~a\" -> \"~a\"~%\"~a\"~:[~;[style=filled,color=\"0 0 0.7\"]~];~%"
                          (btree-value parent) value value
                          (btree-leaf-p b))
-                 (format stream "    ~a;~%" value))
+                 (format stream "    \"~a\";~%" value))
              (when left (p left))
              (when right (p right)))))
     ;; preamble

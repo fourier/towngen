@@ -6,6 +6,8 @@
 
 (in-package town-gen)
 
+(declaim (optimize (debug 3)))
+
 (defstruct circle-event
   (node nil :type point)
   (arc nil :type arc))
@@ -22,7 +24,12 @@
               :documentation "A beach line of the Fortune's method")
    (queue :type prio-queue
           :reader voronoi-queue
-          :documentation "Priority queue for the Fortune's method"))
+          :documentation "Priority queue for the Fortune's method")
+
+   (move-sweepline :reader voronoi-move-sweepline
+    :documentation "Fuction of one argument - the current position of the sweepline. Updates the beachline nodes with
+a new sweepline position. This function is set then the beachline first time created, following the pattern let-over-lambda")
+   )
   (:documentation "Fortune's algorithm for Voronoi diagrams"))
 
 (defmethod event-get-x ((node point))
@@ -62,26 +69,62 @@ No generation performed yet"
   "Handle circle event of the Voronoi diagram"
   (format t "Circle event: ~a~%" circle-event))
 
-(defun make-btree (value)
-  (make-instance 'btree :value value
-                 :comparator
-                 (lambda (a b)
-                   (> (event-get-x a)
-                      (event-get-x b)))))
-
+(defun make-sweepline-functions (&optional (initial-sweepline-pos 0))
+  "Creates a pair of 2 functions - one to update
+sweepline position and second to calculate intersection of 2
+arcs given their focus points (and common directrix - sweepline)"
+  (let ((sweepline-pos initial-sweepline-pos))
+    (cons 
+     (lambda (new-pos)
+       (setf sweepline-pos new-pos))
+     (lambda (p1 p2)
+       (let ((intersections
+              (parabola-intersections p1 p2 sweepline-pos)))
+         (format t "Intersections: ~a~%" intersections)
+         (cond ((null intersections)
+                (error "points are on the same vertical line"))
+               ((null (cdr intersections))
+                (car intersections))
+               (t
+                (destructuring-bind (bp1 bp2) intersections
+                  (if (< (point-y bp1) (point-y bp1))
+                      bp1 bp2)))))))))
+                      
 (defmethod handle-voronoi-queue-event ((self voronoi) (point point))
   "Handle node event of the Voronoi diagram"
     (format t "Node event: ~a~%" point)
     (with-slots (beachline) self
       (if (null beachline)
           ;; create the first element in binary tree
-          (setf beachline (make-btree point))
-          ;; insert into the beach line
-          (multiple-value-bind (new-root new-node)
-              (btree-insert beachline point)
-            (setf beachline root)
+          (destructuring-bind (modifier . divider)
+              (make-sweepline-functions (point-y point))
+            (setf beachline
+                  (make-instance 'btree :value point
+                                 :comparator
+                                 (lambda (a b)
+                                   (> (event-get-x a)
+                                      (event-get-x b)))
+                                 :divider (lambda (a b)
+                                            (make-point :x 
+                                            (/
+                                             (+ (event-get-x a)
+                                                (event-get-x b))
+                                             2.0)
+                                            :y 0.0)))
+                  ;; set the move-sweepline function
+                  (slot-value self 'move-sweepline)
+                  modifier))
+          ;; beachline not empty
+          (progn
+            ;; move the sweepline
+            (funcall (voronoi-move-sweepline self) (point-y point))
+            ;; insert into the beach line
+            (multiple-value-bind (new-root new-node)
+                (btree-insert beachline point)
+              ;; update the beachline root if necessary
+              (setf beachline new-root)
             ;; check for events of the circle
-                                            
+            )))))
 
 
 (defmethod voronoi-generate ((self voronoi))

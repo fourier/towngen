@@ -15,7 +15,6 @@
   :depends-on (alexandria cmu-infix ppath)
   :components ((:file "package")
                (:file "geometry")
-               (:file "arc")
                (:file "btree")
                (:file "circular-list")
                (:file "prio-queue")
