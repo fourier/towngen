@@ -165,6 +165,8 @@ SELECTOR1/2 could be #'btree-left/right"
         ;; update the parent of the sibling to one
         ;; level up
         (setf (btree-parent sibling) pparent)
+        (unless pparent
+          (format t "no parent's parent"))
         ;; promote the sibling up one level
         (when pparent
             ;; if our parent is left branch, replace
@@ -182,7 +184,9 @@ SELECTOR1/2 could be #'btree-left/right"
                              (btree-value (btree-left pparent))
                              (btree-value (btree-right pparent))))))
         ;; disconnect the leaf
-        (setf parent nil)))))
+        (setf parent nil)
+        ;; return new parent
+        pparent))))
         
 
 (defmethod btree-dot ((btree btree) &optional (stream t))

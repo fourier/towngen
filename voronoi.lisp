@@ -67,7 +67,8 @@ No generation performed yet"
 
 (defmethod handle-voronoi-queue-event ((self voronoi) (circle-event circle-event))
   "Handle circle event of the Voronoi diagram"
-  (format t "Circle event: ~a~%" circle-event))
+  (format t "Circle event: ~a~%" circle-event)
+  (btree-remove-leaf (circle-event-arc circle-event)))
 
 (defun make-sweepline-functions (&optional (initial-sweepline-pos 0))
   "Creates a pair of 2 functions - one to update
@@ -151,7 +152,7 @@ arcs given their focus points (and common directrix - sweepline)"
                                   queue
                                   (make-circle-event
                                    :node circle-event-point
-                                   :arc p2)))))))))
+                                   :arc n2)))))))))
                 ;; first triple left-left-center, where center
                 ;; is a new point
                 (when-let* ((l (btree-find-left-neighbor new-node))
