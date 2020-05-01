@@ -296,20 +296,20 @@ Prints output to the stream STREAM"
 
 (defun test-btree2 ()
   (let* ((tree (test-btree2-make))
-         (leftmost (btree-crawl tree #'btree-left))
-         (rightmost (btree-crawl tree #'btree-right))
+         (leftmost (btree-node-crawl (btree-root tree) #'btree-node-left))
+         (rightmost (btree-node-crawl (btree-root tree) #'btree-node-right))
          (lst '(2 5 11 13 14 15 17 18 19 20)))
     (assert (equal lst
-                   (loop for n = leftmost then (btree-find-right-neighbor n)
+                   (loop for n = leftmost then (btree-node-find-right-neighbor n)
                          and p = n
                          while n
-                         collect (values (btree-value n) p))))
+                         collect (values (btree-node-value n) p))))
 
     (assert (equal (nreverse (copy-list lst))
-                   (loop for n = rightmost then (btree-find-left-neighbor n)
+                   (loop for n = rightmost then (btree-node-find-left-neighbor n)
                          and p = n
                          while n
-                         collect (values (btree-value n) p))))))
+                         collect (values (btree-node-value n) p))))))
 
 (defun btree-dot1 (btree)
   (with-open-file (s #+windows "C:/Sources/lisp/towngen/graph1.gv" #-windows "~/Sources/lisp/towngen/graph1.gv" :direction :output :if-exists :supersede)
