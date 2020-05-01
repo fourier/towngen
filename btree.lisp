@@ -9,87 +9,136 @@
 (declaim (optimize (debug 3)))
 
 (defclass btree ()
-  ((value :initarg :value
-          :reader btree-value
-          :documentation "Value of the tree node")
+  ((root :initarg :root :initform nil
+         :accessor btree-root
+         :documentation "Root node of the tree")
    (comparator :initarg :comparator
                :initform #'<
-               :reader comparator
+               :reader btree-comparator
                :documentation "Function used to compare 2 value")
    (divider :initarg :divider
             :reader btree-divider
             :initform (lambda (x y) (/ (+ x y) 2.0))
-            :documentation "Calculates the new middle node between new inserted and old")
-  (left :initform nil
-        :initarg :left
-        :type (or null btree)
-        :accessor btree-left
-        :documentation "Left leaf of the tree")
-  (right :initform nil
-         :initarg :right
-         :type (or null btree)
-         :accessor btree-right
-         :documentation "Right leaf of the tree")
-  (parent :initform nil
-          :initarg :parent
-          :type (or null btree)
-          :accessor btree-parent
-          :documentation "Parent of the node"))
-  (:documentation "Binary tree for Fortune's method.
+            :documentation "Calculates the new middle node between new inserted and old"))
+  (:documentation "Binary tree node for Fortune's method.
 This binary tree has a property that there are no subtrees
 having only one leaf. All roots of the tree have either 0
 leafs, or 2."))
 
-(defmethod btree-< ((btree btree) value)
-  "Compare btree node with value"
-  (funcall (slot-value btree 'comparator)
-           (btree-value btree) value))
+(defclass btree-node ()
+  ((value :initarg :value
+          :reader btree-node-value
+          :documentation "Value of the tree node")
+   (left :initform nil
+         :initarg :left
+         :type (or null btree-node)
+         :accessor btree-node-left
+         :documentation "Left leaf of the tree")
+   (right :initform nil
+          :initarg :right
+          :type (or null btree-node)
+          :accessor btree-node-right
+          :documentation "Right leaf of the tree")
+   (parent :initform nil
+           :initarg :parent
+           :type (or null btree)
+           :accessor btree-node-parent
+           :documentation "Parent of the node"))
+  (:documentation "Node of the binary tree"))
 
-(defmethod btree-make-from ((btree btree) value)
+(defmethod print-object ((self btree-node) stream)
+  "Printer for BTREE-NODE object"
+  (format stream "'~a' <- '~a' -> '~a' (parent: ~a)"
+          (when-let (l (btree-node-left self))
+            (btree-node-value l))
+          (btree-node-value self)
+          (when-let (r (btree-node-right self))
+            (btree-node-value r))
+          (when-let (p (btree-node-parent self))
+            (btree-node-value p))))
+          
+
+
+(defmethod btree-< ((btree btree) (node btree-node) value)
+  "Compare btree node with value"
+  (funcall (btree-comparator btree)
+           (btree-node-value node) value))
+
+(defmethod btree-node-make-from ((node btree-node) value)
   "Create a new node with the same functions and parent
 as old but with a new value"
-  (make-instance 'btree
+  (make-instance 'btree-node
                  :value value
-                 :comparator (slot-value btree 'comparator)
-                 :divider (slot-value btree 'divider)
-                 :parent (slot-value btree 'parent)))
+                 :parent (slot-value node 'parent)))
                  
-(defmethod btree-leaf-p ((btree btree))
-  "Determine if the btree is a leaf, i.e. has no other leafs"
-  (with-slots (left right) btree
+(defmethod btree-node-leaf-p ((node btree-node))
+  "Determine if the node is a leaf, i.e. has no other leafs"
+  (with-slots (left right) node
     (and (null left) (null right))))
 
 (defmethod btree-insert ((btree btree) new-value)
+  (with-slots (root comparator divider) btree
+    (if (null root) ;; no root yet
+        (setf root
+              (make-instance 'btree-node
+                             :value new-value))
+        ;; root is not empty, call helper 
+        (multiple-value-bind (new-root new-node)
+            (btree-insert-helper btree root new-value)
+          (setf root new-root)
+          new-node))))
+
+(defmethod btree-insert-into-leaf ((btree btree)
+                                   (node btree-node)
+                                   new-value)
+  "Insert the VALUE into the binary tree where the NODE is a leaf.
+The new root is created using divider and the original and new-value
+nodes are placed as leafs of this new root
+Returns the values: (new root , new node)"
+  (when (btree-node-leaf-p node)
+    (with-slots (divider) btree
+      (with-slots (value) node
+        (let* ((new-root (make-instance 'btree-node
+                                        :value 
+                                        (funcall divider 
+                                                 value
+                                                 new-value)
+                                        :parent
+                                        (btree-node-parent node)))
+               (new-leaf (make-instance 'btree-node
+                                        :value new-value
+                                        :parent new-root)))
+          ;; update parent of the old node to point to the new root
+          (setf (btree-node-parent node) new-root)
+          ;; where to place old root
+          (if (btree-< btree new-root value)
+              ;; add to the right
+              (setf (btree-node-right new-root) node
+                    (btree-node-left new-root) new-leaf)
+              ;; or add to left
+              (setf (btree-node-left new-root) node
+                    (btree-node-right new-root) new-leaf))
+          (values new-root new-leaf))))))
+
+
+(defmethod btree-insert-helper ((btree btree) (node btree-node) new-value)
   "Insert the VALUE into the binary tree.
 Returns the values: (new root (if necessary), new node)"
-  ;; decide where to put, left or right
-  (with-slots (value) btree
-    ;; case the first root
-    (if (btree-leaf-p btree)
-        ;; new root
-        (let* ((new-root
-                (btree-make-from btree
-                                 (funcall (btree-divider btree) 
-                                          value new-value)))
-               (new-leaf (btree-make-from btree new-value)))
-          ;; update parents
-          (setf (btree-parent btree) new-root
-                (btree-parent new-leaf) new-root)
-          ;; where to place old root
-          (if (btree-< new-root value) ;; add to the right
-              (setf (btree-right new-root) btree
-                    (btree-left new-root) new-leaf)
-              ;; or add to left
-              (setf (btree-left new-root) btree
-                    (btree-right new-root) new-leaf))
-          (values new-root new-leaf))
-        ;; the tree has other nodes, find the closest one
-        (let ((leaf-symbol
-               (if (btree-< btree new-value) 'right 'left)))
-          (multiple-value-bind (new-root new-node)
-              (btree-insert (slot-value btree leaf-symbol) new-value)
-            (setf (slot-value btree leaf-symbol) new-root)
-            (values btree new-node))))))
+  (with-slots (divider comparator) btree
+    (with-slots (value) node
+      ;; leaf case
+      (if (btree-node-leaf-p node)
+          (btree-insert-into-leaf btree node new-value)
+          ;; the tree case, find where to descend (left/right)
+          (let ((leaf-symbol
+                 (if (btree-< btree node new-value) 'right 'left)))
+            (multiple-value-bind (new-root new-node)
+                ;; descend
+                (btree-insert-helper btree (slot-value node leaf-symbol) new-value)
+              ;; now we received potential new root and a new node
+              (setf (slot-value node leaf-symbol) new-root)
+              (setf (btree-node-parent new-root) node)
+              (values node new-node)))))))
     
 (defmethod btree-crawl ((btree btree) selector
                         &optional (stop-then
@@ -196,14 +245,14 @@ Prints output to the stream STREAM"
            (with-slots (parent left right value) b
              (if parent
                  (format stream "    \"~a\" -> \"~a\"~%\"~a\"~:[~;[style=filled,color=\"0 0 0.7\"]~];~%"
-                         (btree-value parent) value value
-                         (btree-leaf-p b))
+                         (btree-node-value parent) value value
+                         (btree-node-leaf-p b))
                  (format stream "    \"~a\";~%" value))
              (when left (p left))
              (when right (p right)))))
     ;; preamble
     (format stream "digraph G {~%")
-    (p btree)
+    (p (btree-root btree))
     ;; postamble
     (format stream "}~%")))
 
@@ -213,29 +262,32 @@ Prints output to the stream STREAM"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defun test-btree ()
-  (let ((b (make-instance 'btree :value 10)))
-    (setf b (btree-insert b 5))
-    (setf b (btree-insert b 7))
+  (let ((b (make-instance 'btree)))
+    (btree-insert b 10)
+    (btree-insert b 5)
+    (btree-insert b 7)
     b))
 
 (defun test-btree1 ()
-  (let ((b (make-instance 'btree :value 4)))
-    (setf b (btree-insert b 1))
-    (setf b (btree-insert b 2))
-    (setf b (btree-insert b 5))
+  (let ((b (make-instance 'btree)))
+    (btree-insert b 4)
+    (btree-insert b 1)
+    (btree-insert b 2)
+    (btree-insert b 5)
     b))
 
 (defun test-btree2-make ()
-  (let ((b (make-instance 'btree :value 20)))
-    (setf b (btree-insert b 11))
-    (setf b (btree-insert b 14))
-    (setf b (btree-insert b 17))
-    (setf b (btree-insert b 13))
-    (setf b (btree-insert b 19))
-    (setf b (btree-insert b 15))
-    (setf b (btree-insert b 5))
-    (setf b (btree-insert b 2))
-    (setf b (btree-insert b 18))
+  (let ((b (make-instance 'btree)))
+    (btree-insert b 20)
+    (btree-insert b 11)
+    (btree-insert b 14)
+    (btree-insert b 17)
+    (btree-insert b 13)
+    (btree-insert b 19)
+    (btree-insert b 15)
+    (btree-insert b 5)
+    (btree-insert b 2)
+    (btree-insert b 18)
     b))
 
 (defun test-btree2 ()
@@ -256,5 +308,5 @@ Prints output to the stream STREAM"
                          collect (values (btree-value n) p))))))
 
 (defun btree-dot1 (btree)
-  (with-open-file (s "C:/Sources/lisp/towngen/graph1.gv" :direction :output :if-exists :supersede)
+  (with-open-file (s #+windows "C:/Sources/lisp/towngen/graph1.gv" #-windows "~/Sources/lisp/towngen/graph1.gv" :direction :output :if-exists :supersede)
     (btree-dot btree s)))
