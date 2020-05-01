@@ -206,40 +206,43 @@ SELECTOR1/2 could be #'btree-left/right"
   (btree-node-find-neighbor node #'btree-node-right #'btree-node-left))
 
 
-(defmethod btree-remove-leaf ((btree btree))
-  "Remove the leaf node from the binary tree"
-  (with-slots (parent) btree
-    (unless (or (null parent) ; only if not root of the tree
-                (not (btree-leaf-p btree))) ; and a leaf
-      (let ((pparent (btree-parent parent))
-            (sibling (if (eq (btree-left parent) btree)
-                         (btree-right parent)
-                         (btree-left parent))))
-        ;; update the parent of the sibling to one
-        ;; level up
-        (setf (btree-parent sibling) pparent)
-        (unless pparent
-          (format t "no parent's parent"))
-        ;; promote the sibling up one level
-        (when pparent
-            ;; if our parent is left branch, replace
-            ;; our parent with sibling
-            (if (eq (btree-left pparent) parent)
-                (setf (btree-left pparent) sibling)
-                ;; otherwise do it with right branch
-                (setf (btree-right pparent) sibling))
-            ;; update the pparent value - if both
-            ;; its left and right values are leafs
-            (when (and (btree-leaf-p (btree-left pparent))
-                       (btree-leaf-p (btree-right pparent)))
-              (setf (slot-value pparent 'value)
-                    (funcall (btree-divider pparent)
-                             (btree-value (btree-left pparent))
-                             (btree-value (btree-right pparent))))))
-        ;; disconnect the leaf
-        (setf parent nil)
-        ;; return new parent
-        pparent))))
+(defmethod btree-remove-leaf ((btree btree) (leaf btree-node))
+  "Remove the LEAF node from the binary tree"
+  (with-slots (root) btree
+    ;; the root, just remove it
+    (if (eq root leaf)
+        (setf root nil)
+        ;; only remove leafs, not internal nodes
+        (when (btree-node-leaf-p leaf)
+          ;; as the node is not root, it has a parent
+          (let* ((parent (btree-node-parent leaf))
+                 ;; parent's parent for deeper nodes
+                 (pparent (btree-node-parent parent))
+                 ;; pickup the other sibling
+                 (sibling (if (eq (btree-node-left parent) leaf)
+                              (btree-node-right parent)
+                              (btree-node-left parent))))
+            ;; update the parent of the sibling to one
+            ;; level up
+            (setf (btree-node-parent sibling) pparent)
+            (unless pparent
+              (format t "no parent's parent"))
+            ;; promote the sibling up one level
+            (when pparent
+              ;; if our parent is left branch, replace
+              ;; our parent with sibling
+              (if (eq (btree-node-left pparent) parent)
+                  (setf (btree-node-left pparent) sibling)
+                  ;; otherwise do it with right branch
+                  (setf (btree-node-right pparent) sibling))
+              ;; update the pparent value - if both
+              ;; its left and right values are leafs
+              (when (and (btree-node-leaf-p (btree-node-left pparent))
+                         (btree-node-leaf-p (btree-node-right pparent)))
+                (setf (slot-value pparent 'value)
+                      (funcall (btree-divider btree)
+                               (btree-node-value (btree-node-left pparent))
+                               (btree-node-value (btree-node-right pparent)))))))))))
         
 
 (defmethod btree-dot ((btree btree) &optional (stream t))
