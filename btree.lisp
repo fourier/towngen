@@ -77,7 +77,9 @@ as old but with a new value"
     (and (null left) (null right))))
 
 (defmethod btree-insert ((btree btree) new-value)
-  (with-slots (root comparator divider) btree
+  "Insert the VALUE into the binary tree.
+Returns the new node created."
+  (with-slots (root) btree
     (if (null root) ;; no root yet
         (setf root
               (make-instance 'btree-node
@@ -139,16 +141,17 @@ Returns the values: (new root (if necessary), new node)"
               (setf (slot-value node leaf-symbol) new-root)
               (setf (btree-node-parent new-root) node)
               (values node new-node)))))))
-    
-(defmethod btree-crawl ((btree btree) selector
-                        &optional (stop-then
-                                   (lambda (x prev)
-                                     (declare (ignore x prev))
-                                     nil)))
-  "Climb the binary tree from current node using specified
-SELECTOR (i.e. btree-right or btree-left or btree-parent), until
-the last element reached with no possible SELECTOR or
-STOP-THEN returned T.
+
+
+(defmethod btree-node-crawl ((start btree-node) selector
+                             &optional (stop-then
+                                        (lambda (x prev)
+                                          (declare (ignore x prev))
+                                          nil)))
+  "Climb the binary tree from current node START using specified
+SELECTOR (i.e. btree-node-right or btree-node-left or
+btree-node-parent), until the last element reached with
+no possible SELECTOR or STOP-THEN returned T.
 The STOP-THEN is a boolean function accepting 2 arguments:
 current element and previous element.
 Return: (values NODE PREVIOUS STOPPED)
@@ -156,7 +159,7 @@ Here NODE is the last node traversed
 PREVIOUS is the previous node,
 STOP-THEN is a boolean flag indicating if the iteration
 prematurely stopped"
-  (loop for node = btree then (funcall selector node)
+  (loop for node = start then (funcall selector node)
         and prev = node
         and prev2 = prev
         while node
@@ -168,13 +171,14 @@ prematurely stopped"
         finally (return (values prev prev2 r))))
         
 
-(defmethod btree-find-neighbor ((btree btree) selector1 selector2)
-  "Find the neighbor for the BTREE on the SELECTOR1 from
+(defmethod btree-node-find-neighbor ((node btree-node)
+                                     selector1 selector2)
+  "Find the neighbor for the NODE on the SELECTOR1 from
 the element. SELECTOR2 is another selector.
 SELECTOR1/2 could be #'btree-left/right"
-  (with-slots (parent) btree
+  (with-slots (parent) node
     ;; only do search if its a leaf and it has a parent
-    (when (and (btree-leaf-p btree) parent)
+    (when (and (btree-node-leaf-p node) parent)
       (flet ((stop-criteria (n p)
                ;; stop on nil
                (or (not n)
@@ -185,21 +189,21 @@ SELECTOR1/2 could be #'btree-left/right"
         ;; find the first parent which has left/right subtree
         ;; not equal to us
         (multiple-value-bind (common-parent prev found)
-            (btree-crawl btree #'btree-parent #'stop-criteria)
+            (btree-node-crawl node #'btree-node-parent #'stop-criteria)
           (declare (ignore prev))
           (when found 
             ;; now go down by the opposite branch of the subtree
             ;; of the common parent
-            (btree-crawl (funcall selector1 common-parent)
+            (btree-node-crawl (funcall selector1 common-parent)
                          selector2)))))))
         
-(defmethod btree-find-left-neighbor ((btree btree))
-  "Find the left leaf neighbor of the leaf BTREE."
-  (btree-find-neighbor btree #'btree-left #'btree-right))
+(defmethod btree-node-find-left-neighbor ((node btree-node))
+  "Find the left leaf neighbor of the leaf NODE."
+  (btree-node-find-neighbor node #'btree-node-left #'btree-node-right))
 
-(defmethod btree-find-right-neighbor ((btree btree))
-  "Find the right leaf neighbor of the leaf BTREE."
-  (btree-find-neighbor btree #'btree-right #'btree-left))
+(defmethod btree-node-find-right-neighbor ((node btree-node))
+  "Find the right leaf neighbor of the leaf NODE."
+  (btree-node-find-neighbor node #'btree-node-right #'btree-node-left))
 
 
 (defmethod btree-remove-leaf ((btree btree))
