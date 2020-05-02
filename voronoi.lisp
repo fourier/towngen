@@ -10,7 +10,7 @@
 
 (defstruct circle-event
   (node nil :type point)
-  (arc nil :type btree))
+  (arc nil :type btree-node))
 
 (defclass voronoi ()
   ((nodes :initform nil :initarg :nodes
@@ -20,8 +20,9 @@
           :reader voronoi-edges
           :documentation "A list of generated edges")
    (beachline :initform nil
+              :type btree
               :reader voronoi-beachline
-              :documentation "A beach line of the Fortune's method")
+              :documentation "A beach line of the Fortune's method. Binary tree")
    (queue :type prio-queue
           :reader voronoi-queue
           :documentation "Priority queue for the Fortune's method")
@@ -45,7 +46,6 @@ a new sweepline position. This function is set then the beachline first time cre
   (point-y (circle-event-node evt)))
 
 
-
 (defmethod initialize-instance :after ((self voronoi)
                                        &key &allow-other-keys)
   ;; create a priority queue
@@ -60,15 +60,18 @@ a new sweepline position. This function is set then the beachline first time cre
                                     (event-get-y b)))))
     (loop for node in nodes do (prio-queue-push queue node))))
 
+
 (defmethod make-voronoi (nodes)
   "Create instance of the Voronoi class.
 No generation performed yet"
   (make-instance 'voronoi :nodes nodes))
 
+
 (defmethod handle-voronoi-queue-event ((self voronoi) (circle-event circle-event))
   "Handle circle event of the Voronoi diagram"
   (format t "Circle event: ~a~%" circle-event)
-  (btree-remove-leaf (circle-event-arc circle-event)))
+  (btree-remove-leaf (voronoi-beachline self) (circle-event-arc circle-event)))
+
 
 (defun make-sweepline-functions (&optional (initial-sweepline-pos 0))
   "Creates a pair of 2 functions - one to update
@@ -90,7 +93,8 @@ arcs given their focus points (and common directrix - sweepline)"
                 (destructuring-bind (bp1 bp2) intersections
                   (if (< (point-y bp1) (point-y bp1))
                       bp1 bp2)))))))))
-                      
+
+
 (defmethod handle-voronoi-queue-event ((self voronoi) (point point))
   "Handle node event of the Voronoi diagram"
   (format t "Node event: ~a~%" point)
@@ -101,7 +105,7 @@ arcs given their focus points (and common directrix - sweepline)"
           (destructuring-bind (modifier . divider)
               (make-sweepline-functions sweepline)
             (setf beachline
-                  (make-instance 'btree :value point
+                  (make-instance 'btree
                                  :comparator
                                  (lambda (a b)
                                    (> (event-get-x a)
@@ -115,23 +119,21 @@ arcs given their focus points (and common directrix - sweepline)"
                                                         :y 0.0)))
                   ;; set the move-sweepline function
                   (slot-value self 'move-sweepline)
-                  modifier))
+                  modifier)
+            (btree-insert beachline point))
           ;; beachline not empty
           (progn
             ;; move the sweepline
             (funcall (voronoi-move-sweepline self) sweepline)
             ;; insert into the beach line
-            (multiple-value-bind (new-root new-node)
-                (btree-insert beachline point)
-              ;; update the beachline root if necessary
-              (setf beachline new-root)              
+            (let ((new-node (btree-insert beachline point)))
               ;; check all triples of nearest points containing
               ;; new point, if they form a circle which has
               ;; lowest point below the sweepline
               (flet ((check-circle-event (n1 n2 n3)
-                       (let ((p1 (btree-value n1))
-                             (p2 (btree-value n2))
-                             (p3 (btree-value n3)))
+                       (let ((p1 (btree-node-value n1))
+                             (p2 (btree-node-value n2))
+                             (p3 (btree-node-value n3)))
                          (multiple-value-bind (c r)
                              (circumcenter-points p1 p2 p3)
                            ;; points non collinear
@@ -155,16 +157,16 @@ arcs given their focus points (and common directrix - sweepline)"
                                    :arc n2)))))))))
                 ;; first triple left-left-center, where center
                 ;; is a new point
-                (when-let* ((l (btree-find-left-neighbor new-node))
-                            (ll (btree-find-left-neighbor l)))
+                (when-let* ((l (btree-node-find-left-neighbor new-node))
+                            (ll (btree-node-find-left-neighbor l)))
                   (check-circle-event l ll new-node))
                 ;; second triple left-center-right
-                (when-let* ((l (btree-find-left-neighbor new-node))
-                            (r (btree-find-right-neighbor new-node)))
+                (when-let* ((l (btree-node-find-left-neighbor new-node))
+                            (r (btree-node-find-right-neighbor new-node)))
                   (check-circle-event l new-node r))
                 ;; third triple center-right-right
-                (when-let* ((r (btree-find-right-neighbor new-node))
-                            (rr (btree-find-right-neighbor r)))
+                (when-let* ((r (btree-node-find-right-neighbor new-node))
+                            (rr (btree-node-find-right-neighbor r)))
                   (check-circle-event new-node r rr)))))))))
 
 
