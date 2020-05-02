@@ -126,21 +126,19 @@ Returns the values: (new root , new node)"
 (defmethod btree-insert-helper ((btree btree) (node btree-node) new-value)
   "Insert the VALUE into the binary tree.
 Returns the values: (new root (if necessary), new node)"
-  (with-slots (divider comparator) btree
-    (with-slots (value) node
-      ;; leaf case
-      (if (btree-node-leaf-p node)
-          (btree-insert-into-leaf btree node new-value)
-          ;; the tree case, find where to descend (left/right)
-          (let ((leaf-symbol
-                 (if (btree-< btree node new-value) 'right 'left)))
-            (multiple-value-bind (new-root new-node)
-                ;; descend
-                (btree-insert-helper btree (slot-value node leaf-symbol) new-value)
-              ;; now we received potential new root and a new node
-              (setf (slot-value node leaf-symbol) new-root)
-              (setf (btree-node-parent new-root) node)
-              (values node new-node)))))))
+  ;; leaf case
+  (if (btree-node-leaf-p node)
+      (btree-insert-into-leaf btree node new-value)
+      ;; the tree case, find where to descend (left/right)
+      (let ((leaf-symbol
+             (if (btree-< btree node new-value) 'right 'left)))
+        (multiple-value-bind (new-root new-node)
+            ;; descend
+            (btree-insert-helper btree (slot-value node leaf-symbol) new-value)
+          ;; now we received potential new root and a new node
+          (setf (slot-value node leaf-symbol) new-root)
+          (setf (btree-node-parent new-root) node)
+          (values node new-node)))))
 
 
 (defmethod btree-node-crawl ((start btree-node) selector
@@ -206,44 +204,57 @@ SELECTOR1/2 could be #'btree-left/right"
   (btree-node-find-neighbor node #'btree-node-right #'btree-node-left))
 
 
+(defmethod btree-node-leaf-sibling ((leaf btree-node))
+  "Find the sibling of the leaf"
+  ;; only for leafs
+  (when (btree-node-leaf-p leaf)
+    ;; and only if parent exist
+    (when-let (parent (btree-node-parent leaf))
+      (if (eq (btree-node-left parent) leaf)
+          (btree-node-right parent)
+          (btree-node-left parent)))))
+
 (defmethod btree-remove-leaf ((btree btree) (leaf btree-node))
   "Remove the LEAF node from the binary tree"
-  (with-slots (root) btree
-    ;; the root, just remove it
-    (if (eq root leaf)
-        (setf root nil)
-        ;; only remove leafs, not internal nodes
-        (when (btree-node-leaf-p leaf)
-          ;; as the node is not root, it has a parent
-          (let* ((parent (btree-node-parent leaf))
-                 ;; parent's parent for deeper nodes
-                 (pparent (btree-node-parent parent))
-                 ;; pickup the other sibling
-                 (sibling (if (eq (btree-node-left parent) leaf)
-                              (btree-node-right parent)
-                              (btree-node-left parent))))
-            ;; update the parent of the sibling to one
-            ;; level up
-            (setf (btree-node-parent sibling) pparent)
-            (unless pparent
-              (format t "no parent's parent"))
-            ;; promote the sibling up one level
-            (when pparent
-              ;; if our parent is left branch, replace
-              ;; our parent with sibling
-              (if (eq (btree-node-left pparent) parent)
-                  (setf (btree-node-left pparent) sibling)
-                  ;; otherwise do it with right branch
-                  (setf (btree-node-right pparent) sibling))
-              ;; update the pparent value - if both
-              ;; its left and right values are leafs
-              (when (and (btree-node-leaf-p (btree-node-left pparent))
-                         (btree-node-leaf-p (btree-node-right pparent)))
-                (setf (slot-value pparent 'value)
-                      (funcall (btree-divider btree)
-                               (btree-node-value (btree-node-left pparent))
-                               (btree-node-value (btree-node-right pparent)))))))))))
-        
+  ;; only remove leafs, not internal nodes
+  (when (btree-node-leaf-p leaf)  
+    (with-slots (root) btree
+      ;; the root, just remove it
+      (cond ((eq root leaf)
+             (setf root nil))
+            ;; then the parent is root, set the root to sibling
+            ((eq (btree-node-parent leaf) root)
+             (let ((sibling (btree-node-leaf-sibling leaf)))
+               (setf (btree-node-parent sibling) nil
+                     root sibling)))
+            ;; in all other cases
+            (t
+             ;; as the node is not root, it has a parent
+             (let* ((parent (btree-node-parent leaf))
+                    ;; parent's parent for deeper nodes
+                    (pparent (btree-node-parent parent))
+                    ;; pickup the other sibling
+                    (sibling (btree-node-leaf-sibling leaf)))
+               ;; update the parent of the sibling to one
+               ;; level up
+               (setf (btree-node-parent sibling) pparent)
+               ;; promote the sibling up one level
+               (when pparent
+                 ;; if our parent is left branch, replace
+                 ;; our parent with sibling
+                 (if (eq (btree-node-left pparent) parent)
+                     (setf (btree-node-left pparent) sibling)
+                     ;; otherwise do it with right branch
+                     (setf (btree-node-right pparent) sibling))
+                 ;; update the pparent value - if both
+                 ;; its left and right values are leafs
+                 (when (and (btree-node-leaf-p (btree-node-left pparent))
+                            (btree-node-leaf-p (btree-node-right pparent)))
+                   (setf (slot-value pparent 'value)
+                         (funcall (btree-divider btree)
+                                  (btree-node-value (btree-node-left pparent))
+                                  (btree-node-value (btree-node-right pparent))))))))))))
+  
 
 (defmethod btree-dot ((btree btree) &optional (stream t))
   "Generate the DOT syntax for drawing the binary tree.
