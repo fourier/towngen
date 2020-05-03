@@ -80,11 +80,11 @@
                                       (- height border-y)))
           ;; draw border
           (gp:draw-rectangle pixmap area-x area-y area-w area-h :filled t :foreground :grey85)
-          (let ((points
-                 (loop for p in (voronoi-nodes voronoi)
-                       collect (+ ox (* sx (point-x p)))
-                       collect (- height (+ oy (* sy (point-y p)))))))
-            (gp:draw-points pixmap points :foreground :red)))
+          (loop for p in (voronoi-nodes voronoi)
+                for x = (+ ox (* sx (point-x p)))
+                for y = (- height (+ oy (* sy (point-y p))))
+                do 
+                (gp:draw-circle pixmap x y 2 :foreground :red :filled t)))
         ;; show the pixmap. 
         (gp:copy-pixels pane pixmap 0 0 width height 0 0)))))
 
