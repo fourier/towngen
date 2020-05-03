@@ -17,7 +17,11 @@
                :documentation "Function used to compare 2 value")
    (divider :initarg :divider
             :initform (lambda (x y) (/ (+ x y) 2.0))
-            :documentation "Calculates the new middle node between new inserted and old"))
+            :documentation "Calculates the new middle node between new inserted and old")
+   (divider-on-remove :initarg :divider-on-remove
+                      :initform (lambda (x y) (/ (+ x y) 2.0))
+                      :documentation
+                      "Calculates the new middle node then the leaf is removed"))
   (:documentation "Binary tree node for Fortune's method.
 This binary tree has a property that there are no subtrees
 having only one leaf. All roots of the tree have either 0
@@ -66,7 +70,12 @@ leafs, or 2."))
 (defmethod btree-divider ((btree btree) v1 v2)
   "Calculate middle node between 2 btree node values using divider"
   (funcall (slot-value btree 'divider) v1 v2))
-           
+
+(defmethod btree-divider-on-remove ((btree btree) v1 v2)
+  "Calculate middle node between 2 btree node values using divider.
+Called then leaf is removed in contrast to divider"
+  (funcall (slot-value btree 'divider-on-remove) v1 v2))
+
   
 
 (defmethod btree-node-make-from ((node btree-node) value)
@@ -255,9 +264,10 @@ SELECTOR1/2 could be #'btree-left/right"
                  (when (and (btree-node-leaf-p (btree-node-left pparent))
                             (btree-node-leaf-p (btree-node-right pparent)))
                    (setf (slot-value pparent 'value)
-                         (btree-divider btree
-                                        (btree-node-value (btree-node-left pparent))
-                                        (btree-node-value (btree-node-right pparent))))))))))))
+                         (btree-divider-on-remove
+                          btree
+                          (btree-node-value (btree-node-left pparent))
+                          (btree-node-value (btree-node-right pparent))))))))))))
   
 
 (defmethod btree-dot ((btree btree) &optional (stream t))

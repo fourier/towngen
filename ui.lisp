@@ -13,7 +13,8 @@
 
 
 (define-interface voronoi-ui ()
-  ((voronoi :initarg nil))
+  ((voronoi :initform nil)
+   (sweepline :initform nil))
   (:panes
    (draw-board output-pane
                :min-width 500
@@ -21,7 +22,7 @@
                :draw-with-buffer t
                :resize-callback 'on-resize-draw-board
                :display-callback 'on-redisplay-draw-board)
-   (generate-button push-button :text "Generate" :callback
+   (generate-button push-button :text "Next step" :callback
 'on-generate-button))
   (:layouts
    (main-layout column-layout '(draw-board
@@ -47,23 +48,33 @@
          (nodes
           (loop for (x y) in pts collect
                 (make-point :x x :y y)))
-         (v (make-instance 'voronoi :nodes nodes)))
+         (v (make-instance 'voronoi :nodes nodes
+                           :sweepline-event-callback
+                           (lambda (y)
+                             (sweepline-event self Y)))))
     (setf (slot-value self 'voronoi) v)
-    (on-generate-button nil self)))
+    (gp:invalidate-rectangle (slot-value self 'draw-board))))
+
+
+(defmethod sweepline-event ((self voronoi-ui) y)
+  (setf (slot-value self 'sweepline) y)
+  (format t "Sweepline moved to ~a~%" y)
+  (capi:apply-in-pane-process self 'gp:invalidate-rectangle (slot-value self 'draw-board)))
 
 
 (defun on-generate-button (data self)
   "Callback called then the user press Generate button"
   (declare (ignore data))           
   (with-slots (draw-board voronoi) self
-    (voronoi-generate voronoi)
+    (voronoi-generate-step voronoi)
     ;; force redisplay
     (gp:invalidate-rectangle draw-board)))
 
 
+
 (defun on-redisplay-draw-board (pane x y width height)
   (let ((interface (element-interface pane)))
-    (with-slots (voronoi) interface
+    (with-slots (voronoi sweepline) interface
       ;; calculate draw area. The draw area is approximately 15%
       ;; from borders.
       (let* ((border-x #I( 15 * (width / 100) ))
@@ -78,13 +89,26 @@
             (scale-shift-box bb (list area-x area-y
                                       (- width border-x)
                                       (- height border-y)))
+          (format t "sx ~a sy ~a ox ~a oy ~a~%"
+                  sx sy ox oy)
           ;; draw border
           (gp:draw-rectangle pixmap area-x area-y area-w area-h :filled t :foreground :grey85)
-          (loop for p in (voronoi-nodes voronoi)
-                for x = (+ ox (* sx (point-x p)))
-                for y = (- height (+ oy (* sy (point-y p))))
-                do 
-                (gp:draw-circle pixmap x y 2 :foreground :red :filled t)))
+          (flet ((new-x (x) (+ ox (* sx x)))
+                 (new-y (y) (- height (+ oy (* sy y)))))
+            (loop for p in (voronoi-nodes voronoi)
+                  for x = (new-x (point-x p))
+                  for y = (new-y (point-y p))
+                  do 
+                  (gp:draw-circle pixmap x y 2
+                                  :foreground :red :filled t))
+            (when sweepline
+              (format t "drawing sweepline from ~a ~a to ~a ~a~%"
+                            area-x (new-y sweepline)
+                            (+ area-w area-x) (new-y sweepline))
+              (gp:draw-line pixmap
+                            area-x (new-y sweepline)
+                            (+ area-w area-x) (new-y sweepline)
+                          :foreground :blue))))
         ;; show the pixmap. 
         (gp:copy-pixels pane pixmap 0 0 width height 0 0)))))
 

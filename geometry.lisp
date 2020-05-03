@@ -148,7 +148,7 @@ given by their focuses"
   (with-coords (focus1 focus2)
     (flet ((f (x)
              #I((x - x1)^^2/(2*(y1 - l)) + (l + y1)/2))
-           (close (x y)
+           (close-values (x y)
              (let ((eps *point-precision*))
                #I( abs(x-y) < eps))))
       ;; calculate coefficients in quadratic equation
@@ -158,7 +158,9 @@ given by their focuses"
              ;; calculate the discriminant
              (d #I(b^^2 - a*c)))
         ;; depending on discriminant solve the equation
-        (cond ((close d 0)
+        (cond ((close-values a 0)
+               (parabola-intersections focus1 (make-point :x x2 :y (1+ y2)) l))
+              ((close-values d 0)
                (let ((x #I(-b / a)))
                  (list (make-point :x x :y (f x)))))
               ((> d 0)

@@ -29,6 +29,7 @@
               :reader voronoi-beachline
               :documentation "A beach line of the Fortune's method. Binary tree")
    (queue :type prio-queue
+          :initform nil
           :reader voronoi-queue
           :documentation "Priority queue for the Fortune's method")
 
@@ -98,22 +99,13 @@ arcs given their focus points (and common directrix - sweepline)"
 (defmethod initialize-instance :after ((self voronoi)
                                        &key &allow-other-keys)
   ;; create a priority queue
-  (with-slots (nodes queue bounding-box move-sweepline intersection) self
+  (with-slots (nodes bounding-box move-sweepline intersection) self
     (unless nodes (error "No nodes in Voronoin diagram"))
     (destructuring-bind (modifier . divider)
         (make-sweepline-functions)
       (setf move-sweepline modifier
             intersection divider
-            ;; Push to the priority queue all nodes sorting
-            ;; by Y coordinate
-            queue (make-instance 'prio-queue
-                                 :test
-                                 (lambda (a b)
-                                   (< (event-get-y a)
-                                      (event-get-y b))))
-            bounding-box (boundig-box nodes)))
-    (loop for node in nodes do (prio-queue-push queue node))))
-
+            bounding-box (boundig-box nodes)))))
 
 (defmethod make-voronoi (nodes)
   "Create instance of the Voronoi class.
@@ -124,12 +116,16 @@ No generation performed yet"
 (defmethod handle-voronoi-queue-event :before ((self voronoi) event)
   ;; move the sweepline
   (format t "Sweepline at ~a~%" (event-get-y event))
-  (funcall (voronoi-move-sweepline self) (event-get-y event)))
+  (funcall (voronoi-move-sweepline self) (event-get-y event))
+  (funcall (slot-value self 'sweepline-event-callback) (event-get-y event)))
 
 
 (defmethod handle-voronoi-queue-event ((self voronoi) (circle-event circle-event))
   "Handle circle event of the Voronoi diagram"
   (format t "Circle event: ~a~%" circle-event)
+  (funcall (slot-value self 'circle-event-callback)
+           (circle-event-node circle-event)
+           (circle-event-radius circle-event))
   (btree-remove-leaf (voronoi-beachline self) (circle-event-arc circle-event)))
 
 
@@ -149,7 +145,11 @@ No generation performed yet"
                                                  (+ (point-x a)
                                                     (point-x b))
                                                  2.0)
-                                                :y 0.0))))
+                                                :y 0.0))
+                         :divider-on-remove
+                         (lambda (a b)
+                           (funcall (voronoi-intersection self)
+                                    a b))))
     (btree-insert beachline point)))
 
 
@@ -211,7 +211,19 @@ No generation performed yet"
 (defmethod voronoi-generate ((self voronoi))
   ;; implementation follows the link
   ;; https://web.archive.org/web/20110601031438/http://cgm.cs.mcgill.ca/~mcleish/644/Projects/DerekJohns/Sweep.htm#DataStructures
-  (with-slots (nodes queue) self
+  (with-slots (nodes queue beachline edges) self
+    ;; recreate all structures
+    (funcall (voronoi-move-sweepline self) 0)
+    (setf beachline nil
+          edges nil)
+    ;; Push to the priority queue all nodes sorting
+    ;; by Y coordinate
+    (setf queue (make-instance 'prio-queue
+                               :test
+                               (lambda (a b)
+                                 (< (event-get-y a)
+                                    (event-get-y b)))))
+    (loop for node in nodes do (prio-queue-push queue node))
     (loop for evt = (prio-queue-pop queue)
           while evt
           ;; pickup the event from the queue
@@ -219,6 +231,36 @@ No generation performed yet"
           ;; dispatch by event type
           do (handle-voronoi-queue-event self evt)))
   self)
+
+(defmethod voronoi-generate-step ((self voronoi))
+  ;; implementation follows the link
+  ;; https://web.archive.org/web/20110601031438/http://cgm.cs.mcgill.ca/~mcleish/644/Projects/DerekJohns/Sweep.htm#DataStructures
+  (with-slots (nodes queue beachline edges) self
+    (if (and (null beachline) (null queue))
+        ;; nothing created yet
+        (progn
+          ;; recreate all structures
+          (funcall (voronoi-move-sweepline self) 0)
+          (setf edges nil
+                ;; Push to the priority queue all nodes sorting
+                ;; by Y coordinate
+                queue (make-instance 'prio-queue
+                                     :test
+                                     (lambda (a b)
+                                       (< (event-get-y a)
+                                          (event-get-y b)))))
+          (loop for node in nodes do (prio-queue-push queue node))
+          ;; schedule a step
+          (voronoi-generate-step self))
+        ;; check if we have events to process
+        (if-let (evt (prio-queue-pop queue))
+            ;; pickup the event from the queue
+            ;; the handle-voronoi-queue-event will
+            ;; dispatch by event type
+            (handle-voronoi-queue-event self evt)
+          ;; no more events, clear the data
+          (setf beachline nil queue nil)))
+    self))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; tests
