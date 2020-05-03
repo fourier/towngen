@@ -18,6 +18,7 @@
                (:file "btree")
                (:file "circular-list")
                (:file "prio-queue")
-               (:file "voronoi"))
+               (:file "voronoi")
+               #+lispworks (:file "ui"))
   :description "")
 ;;  :in-order-to ((test-op (test-op towngen-test))))

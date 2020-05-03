@@ -167,3 +167,14 @@ given by their focuses"
                  (list (make-point :x x+ :y (f x+))
                        (make-point :x x- :y (f x-)))))
               (t nil))))))
+
+
+(defun boundig-box (points)
+  "Calculate bounding box for the list of points. Return 4 coordinates:
+x1,y1,x2,y2 for top-left and bottom-right corners of the bounding box"
+  (loop for p in points
+        minimizing (point-x p) into x1
+        minimizing (point-y p) into y1
+        maximizing (point-x p) into x2
+        maximizing (point-y p) into y2
+        finally (return (list x1 y1 x2 y2))))

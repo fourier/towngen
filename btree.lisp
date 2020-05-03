@@ -14,10 +14,8 @@
          :documentation "Root node of the tree")
    (comparator :initarg :comparator
                :initform #'<
-               :reader btree-comparator
                :documentation "Function used to compare 2 value")
    (divider :initarg :divider
-            :reader btree-divider
             :initform (lambda (x y) (/ (+ x y) 2.0))
             :documentation "Calculates the new middle node between new inserted and old"))
   (:documentation "Binary tree node for Fortune's method.
@@ -61,8 +59,15 @@ leafs, or 2."))
 
 (defmethod btree-< ((btree btree) (node btree-node) value)
   "Compare btree node with value"
-  (funcall (btree-comparator btree)
+  (funcall (slot-value btree 'comparator)
            (btree-node-value node) value))
+
+
+(defmethod btree-divider ((btree btree) v1 v2)
+  "Calculate middle node between 2 btree node values using divider"
+  (funcall (slot-value btree 'divider) v1 v2))
+           
+  
 
 (defmethod btree-node-make-from ((node btree-node) value)
   "Create a new node with the same functions and parent
@@ -98,29 +103,28 @@ The new root is created using divider and the original and new-value
 nodes are placed as leafs of this new root
 Returns the values: (new root , new node)"
   (when (btree-node-leaf-p node)
-    (with-slots (divider) btree
-      (with-slots (value) node
-        (let* ((new-root (make-instance 'btree-node
-                                        :value 
-                                        (funcall divider 
-                                                 value
-                                                 new-value)
-                                        :parent
-                                        (btree-node-parent node)))
-               (new-leaf (make-instance 'btree-node
-                                        :value new-value
-                                        :parent new-root)))
-          ;; update parent of the old node to point to the new root
-          (setf (btree-node-parent node) new-root)
-          ;; where to place old root
-          (if (btree-< btree new-root value)
-              ;; add to the right
-              (setf (btree-node-right new-root) node
-                    (btree-node-left new-root) new-leaf)
-              ;; or add to left
-              (setf (btree-node-left new-root) node
-                    (btree-node-right new-root) new-leaf))
-          (values new-root new-leaf))))))
+    (with-slots (value) node
+      (let* ((new-root (make-instance 'btree-node
+                                      :value 
+                                      (btree-divider btree 
+                                                     value
+                                                     new-value)
+                                      :parent
+                                      (btree-node-parent node)))
+             (new-leaf (make-instance 'btree-node
+                                      :value new-value
+                                      :parent new-root)))
+        ;; update parent of the old node to point to the new root
+        (setf (btree-node-parent node) new-root)
+        ;; where to place old root
+        (if (btree-< btree new-root value)
+            ;; add to the right
+            (setf (btree-node-right new-root) node
+                  (btree-node-left new-root) new-leaf)
+            ;; or add to left
+            (setf (btree-node-left new-root) node
+                  (btree-node-right new-root) new-leaf))
+        (values new-root new-leaf)))))
 
 
 (defmethod btree-insert-helper ((btree btree) (node btree-node) new-value)
@@ -251,9 +255,9 @@ SELECTOR1/2 could be #'btree-left/right"
                  (when (and (btree-node-leaf-p (btree-node-left pparent))
                             (btree-node-leaf-p (btree-node-right pparent)))
                    (setf (slot-value pparent 'value)
-                         (funcall (btree-divider btree)
-                                  (btree-node-value (btree-node-left pparent))
-                                  (btree-node-value (btree-node-right pparent))))))))))))
+                         (btree-divider btree
+                                        (btree-node-value (btree-node-left pparent))
+                                        (btree-node-value (btree-node-right pparent))))))))))))
   
 
 (defmethod btree-dot ((btree btree) &optional (stream t))

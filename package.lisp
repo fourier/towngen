@@ -7,5 +7,5 @@
 (in-package :cl-user)
 
 (defpackage town-gen
-  (:use :cl :alexandria))
+  (:use :cl :alexandria #+:lispworks :capi))
 
