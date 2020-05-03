@@ -10,16 +10,17 @@
 
 (defstruct circle-event
   (node nil :type point)
-  (arc nil :type btree-node))
+  (arc nil :type btree-node)
+  (radius nil :type float))
 
 
 (defclass voronoi ()
   ((nodes :initform nil :initarg :nodes
           :reader voronoi-nodes
           :documentation "A list of nodes to build Voronoi diagram from")
-   (boundig-box :initform nil
-                :reader voronoi-bounding-box
-                :documentation "a list of 4 coordinates of a bounding box: top left - bottom right")
+   (bounding-box :initform nil
+                 :reader voronoi-bounding-box
+                 :documentation "a list of 4 coordinates of a bounding box: top left - bottom right")
    (edges :initform nil
           :reader voronoi-edges
           :documentation "A list of generated edges")
@@ -35,7 +36,16 @@
     :documentation "Fuction of one argument - the current position of the sweepline. Updates the beachline nodes with
 a new sweepline position. This function is set then the beachline first time created, following the pattern let-over-lambda")
    (intersection :reader voronoi-intersection
-                 :documentation "Function of 2 arguments - 2 points, which calculates the intersection of the corresponding parabolas where 2 points are focuses and sweepline is a common directrix"))
+                 :documentation "Function of 2 arguments - 2 points, which calculates the intersection of the corresponding parabolas where 2 points are focuses and sweepline is a common directrix")
+   ;; UI callbacks
+   (sweepline-event-callback :initform #'identity
+                             :initarg :sweepline-event-callback
+                             :documentation
+                             "Callback of one argument - Y coordinate, called then sweepline is moved to the position Y")
+   (circle-event-callback :initform (lambda (c r) (declare (ignore c r)))
+                          :initarg :circle-event-callback
+                          :documentation
+                    "Callback of 2 arguments - center(point) and radious, called then circle event happens"))
   (:documentation "Fortune's algorithm for Voronoi diagrams"))
 
 
@@ -53,6 +63,14 @@ a new sweepline position. This function is set then the beachline first time cre
 
 (defmethod event-get-y ((evt circle-event))
   (point-y (circle-event-node evt)))
+
+
+(defmethod event-get-point ((node point))
+  node)
+
+(defmethod event-get-point ((evt circle-event))
+  (circle-event-node evt))
+
 
 
 (defun make-sweepline-functions (&optional (initial-sweepline-pos 0))
@@ -80,7 +98,7 @@ arcs given their focus points (and common directrix - sweepline)"
 (defmethod initialize-instance :after ((self voronoi)
                                        &key &allow-other-keys)
   ;; create a priority queue
-  (with-slots (nodes queue move-sweepline intersection) self
+  (with-slots (nodes queue bounding-box move-sweepline intersection) self
     (unless nodes (error "No nodes in Voronoin diagram"))
     (destructuring-bind (modifier . divider)
         (make-sweepline-functions)
@@ -92,7 +110,8 @@ arcs given their focus points (and common directrix - sweepline)"
                                  :test
                                  (lambda (a b)
                                    (< (event-get-y a)
-                                      (event-get-y b))))))
+                                      (event-get-y b))))
+            bounding-box (boundig-box nodes)))
     (loop for node in nodes do (prio-queue-push queue node))))
 
 
@@ -121,13 +140,14 @@ No generation performed yet"
           (make-instance 'btree
                          :comparator
                          (lambda (a b)
-                           (> (event-get-x a)
-                              (event-get-x b)))
-                         :divider (lambda (a b)
+                           (> (point-x a)
+                              (point-x b)))
+                         :divider
+                         (lambda (a b)
                                     (make-point :x 
                                                 (/
-                                                 (+ (event-get-x a)
-                                                    (event-get-x b))
+                                                 (+ (point-x a)
+                                                    (point-x b))
                                                  2.0)
                                                 :y 0.0))))
     (btree-insert beachline point)))
@@ -171,7 +191,8 @@ No generation performed yet"
                                 queue
                                 (make-circle-event
                                  :node circle-event-point
-                                 :arc n2)))))))))
+                                 :arc n2
+                                 :radius r)))))))))
               ;; first triple left-left-center, where center
               ;; is a new point
               (when-let* ((l (btree-node-find-left-neighbor new-node))

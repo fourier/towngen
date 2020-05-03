@@ -178,3 +178,26 @@ x1,y1,x2,y2 for top-left and bottom-right corners of the bounding box"
         maximizing (point-x p) into x2
         maximizing (point-y p) into y2
         finally (return (list x1 y1 x2 y2))))
+
+(defun scale-shift-box (b1 b2)
+  "Given 2 bounding boxes, where each box is a list of 4 numbers -
+coordinates for top left and bottom right corners, calculate the
+scale and shift to place all points from box B1 to box B2.
+Return list of 4 values: scale x, offset x, scale y, offset y.
+The point in box b1 with coordinates x and y will be transormed
+into b2 the following way:
+new_x = x*scale_x + offset_x
+new_y = y*scale_y + offset_y"
+  (let* ((b1w #I( elt(b1 2) - elt(b1 0) ))
+         (b1h #I( elt(b1 3) - elt(b1 1) ))
+         (b2w #I( elt(b2 2) - elt(b2 0) ))
+         (b2h #I( elt(b2 3) - elt(b2 1) ))
+         (sx #I( b2w / b1w ))
+         (sy #I( b2h / b1h ))
+         (offx #I( elt(b2 0) - elt(b1 0)*sx))
+         (offy #I( elt(b2 1) - elt(b1 1)*sy)))
+    (list sx sy offx offy)))
+
+
+                                
+                                
