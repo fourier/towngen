@@ -13,8 +13,8 @@
   "Precision for considering 2 points equal")
 
 (defstruct point
-  (x 0.0 :type float)
-  (y 0.0 :type float))
+  (x 0.0 :type number)
+  (y 0.0 :type number))
 
 
 (defclass triangle ()

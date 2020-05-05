@@ -228,7 +228,8 @@ SELECTOR1/2 could be #'btree-left/right"
           (btree-node-left parent)))))
 
 (defmethod btree-remove-leaf ((btree btree) (leaf btree-node))
-  "Remove the LEAF node from the binary tree"
+  "Remove the LEAF node from the binary tree.
+Returns the new parent of the promoted sibling (or nil)"
   ;; only remove leafs, not internal nodes
   (when (btree-node-leaf-p leaf)  
     (with-slots (root) btree
@@ -239,7 +240,8 @@ SELECTOR1/2 could be #'btree-left/right"
             ((eq (btree-node-parent leaf) root)
              (let ((sibling (btree-node-leaf-sibling leaf)))
                (setf (btree-node-parent sibling) nil
-                     root sibling)))
+                     root sibling))
+             nil)
             ;; in all other cases
             (t
              ;; as the node is not root, it has a parent
@@ -267,7 +269,8 @@ SELECTOR1/2 could be #'btree-left/right"
                          (btree-divider-on-remove
                           btree
                           (btree-node-value (btree-node-left pparent))
-                          (btree-node-value (btree-node-right pparent))))))))))))
+                          (btree-node-value (btree-node-right pparent))))
+                   pparent))))))))
   
 
 (defmethod btree-dot ((btree btree) &optional (stream t))
@@ -338,6 +341,13 @@ Prints output to the stream STREAM"
                          and p = n
                          while n
                          collect (values (btree-node-value n) p))))))
+
+(defun test-btree3 ()
+  (let ((b (make-instance 'btree)))
+    (btree-insert b 2)
+    (btree-insert b 5)
+    b))
+
 
 (defun btree-dot1 (btree)
   (with-open-file (s #+windows "C:/Sources/lisp/towngen/graph1.gv" #-windows "~/Sources/lisp/towngen/graph1.gv" :direction :output :if-exists :supersede)

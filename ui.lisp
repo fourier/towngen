@@ -14,7 +14,8 @@
 
 (define-interface voronoi-ui ()
   ((voronoi :initform nil)
-   (sweepline :initform nil))
+   (sweepline :initform nil)
+   (last-circle-event :initform nil))
   (:panes
    (draw-board output-pane
                :min-width 500
@@ -22,13 +23,18 @@
                :draw-with-buffer t
                :resize-callback 'on-resize-draw-board
                :display-callback 'on-redisplay-draw-board)
-   (generate-button push-button :text "Next step" :callback
-'on-generate-button))
+   (log display-pane
+        :visible-min-height '(:character 1)
+        :text "Not started")
+   (generate-button push-button
+                    :text "Next step"
+                    :callback 'on-generate-button))
   (:layouts
    (main-layout column-layout '(draw-board
+                                log
                                 generate-button)
                 :adjust :center
-                :y-ratios '(1 nil)
+                :y-ratios '(1 nil nil)
                 :internal-border 20))
   (:default-initargs :title "Voronoi diagram"
    :layout 'main-layout))
@@ -45,8 +51,21 @@
                 (8.76779 1.28443)
                 (3.94233 6.88071)
                 (9.98516 9.91357)))
+         (pts2 '((2 1)
+                 (3.4 7.2)
+                 (9 10)
+                 (12 5)
+                 (10 1)
+                 (7 5)
+                 (8 7)
+                 (5 10)
+                 (7 3)
+                 (3.8 3.8)
+                 (12 8)
+                 (15 4)
+                 (9.4 4)))
          (nodes
-          (loop for (x y) in pts collect
+          (loop for (x y) in pts2 collect
                 (make-point :x x :y y)))
          (v (make-instance 'voronoi :nodes nodes
                            :sweepline-event-callback
@@ -58,7 +77,10 @@
 
 (defmethod sweepline-event ((self voronoi-ui) y)
   (setf (slot-value self 'sweepline) y)
-  (format t "Sweepline moved to ~a~%" y)
+  (capi:apply-in-pane-process 
+   self #'(setf capi:display-pane-text) 
+   (format nil "Sweepline moved to ~a~%" y)
+   (slot-value self 'log))
   (capi:apply-in-pane-process self 'gp:invalidate-rectangle (slot-value self 'draw-board)))
 
 
@@ -69,7 +91,6 @@
     (voronoi-generate-step voronoi)
     ;; force redisplay
     (gp:invalidate-rectangle draw-board)))
-
 
 
 (defun on-redisplay-draw-board (pane x y width height)
@@ -89,8 +110,6 @@
             (scale-shift-box bb (list area-x area-y
                                       (- width border-x)
                                       (- height border-y)))
-          (format t "sx ~a sy ~a ox ~a oy ~a~%"
-                  sx sy ox oy)
           ;; draw border
           (gp:draw-rectangle pixmap area-x area-y area-w area-h :filled t :foreground :grey85)
           (flet ((new-x (x) (+ ox (* sx x)))
@@ -102,13 +121,30 @@
                   (gp:draw-circle pixmap x y 2
                                   :foreground :red :filled t))
             (when sweepline
-              (format t "drawing sweepline from ~a ~a to ~a ~a~%"
-                            area-x (new-y sweepline)
-                            (+ area-w area-x) (new-y sweepline))
               (gp:draw-line pixmap
                             area-x (new-y sweepline)
                             (+ area-w area-x) (new-y sweepline)
-                          :foreground :blue))))
+                            :foreground :blue))
+            ;; draw edges
+            (when-let (edges (voronoi-edges voronoi))
+              (loop for edge in edges do
+                    (format t "Edge ~a~%" edge)
+                    ;;;                     (gp:draw-line pixmap
+                    ;;;                                   (new-x (point-x (car edge)))
+                    ;;;                                   (new-y (point-y (car edge)))
+                    ;;;                                   (new-x (point-x (cdr edge)))
+                    ;;;                                   (new-y (point-y (cdr edge)))
+                    ;;;                                   (gp:draw-line pixmap
+                    ;;;                                   :foreground :blue2)
+                    (gp:draw-circle pixmap
+                                    (new-x (point-x (car edge)))
+                                    (new-y (point-y (car edge)))
+                                    2
+                                  
+                                    :foreground :darkolivegreen :filled t)
+
+                    ))))
+                                  
         ;; show the pixmap. 
         (gp:copy-pixels pane pixmap 0 0 width height 0 0)))))
 

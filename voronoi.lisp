@@ -126,7 +126,17 @@ No generation performed yet"
   (funcall (slot-value self 'circle-event-callback)
            (circle-event-node circle-event)
            (circle-event-radius circle-event))
-  (btree-remove-leaf (voronoi-beachline self) (circle-event-arc circle-event)))
+  (when-let (bp (btree-remove-leaf
+                 (voronoi-beachline self)
+                 (circle-event-arc circle-event)))
+    ;; create a new edge
+    (let* ((pnt (event-get-point circle-event))
+           (center (make-point :x (point-x pnt)
+                               :y (+ (point-y pnt)
+                                     (circle-event-radius circle-event)))))
+      (pushnew (cons center (btree-node-value bp))
+             (slot-value self 'edges)))))
+    
 
 
 (defmethod create-binary-tree ((self voronoi) (point point))
@@ -176,7 +186,7 @@ No generation performed yet"
                          ;; points non collinear
                          (when (and c r)
                            ;; lowest point of the circle
-                           (let ((circle-event-point
+                           (let ((circle-event-point 
                                   (make-point :x (point-x c)
                                               :y (- (point-y c) r))))
                              ;; only if the lowest point below
@@ -259,7 +269,7 @@ No generation performed yet"
             ;; dispatch by event type
             (handle-voronoi-queue-event self evt)
           ;; no more events, clear the data
-          (setf beachline nil queue nil)))
+          (setf beachline nil queue nil edges nil)))
     self))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
