@@ -12,10 +12,11 @@
   :version "0.1"
   :author ""
   :license ""
-  :depends-on (alexandria cmu-infix ppath)
+  :depends-on (alexandria cmu-infix)
   :components ((:file "package")
                (:file "geometry")
                (:file "btree")
+               (:file "beachline")
                (:file "circular-list")
                (:file "prio-queue")
                (:file "voronoi")

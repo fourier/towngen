@@ -171,6 +171,23 @@ given by their focuses"
               (t nil))))))
 
 
+(defmethod parabola-intersection ((focus1 point) (focus2 point) (l number))
+  "Calculate intersection of 2 arcs with the same directrix,
+given by their focuses, and return only the one in between focuses,
+if possible"
+  (let ((intersections
+         (parabola-intersections focus1 focus2 l)))
+    (format t "Intersections: ~a~%" intersections)
+    (cond ((null intersections)
+           (error "points are on the same vertical line"))
+          ((null (cdr intersections))
+           (car intersections))
+          (t
+           (destructuring-bind (bp1 bp2) intersections
+             (if (< (point-y bp1) (point-y bp1))
+                 bp1 bp2))))))
+
+
 (defun boundig-box (points)
   "Calculate bounding box for the list of points. Return 4 coordinates:
 x1,y1,x2,y2 for top-left and bottom-right corners of the bounding box"

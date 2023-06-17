@@ -8,10 +8,6 @@
 
 (declaim (optimize (debug 3)))
 
-(defstruct circle-event
-  (node nil :type point)
-  (arc nil :type btree-node)
-  (radius nil :type float))
 
 
 (defclass voronoi ()
